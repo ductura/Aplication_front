@@ -11,7 +11,7 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
@@ -27,3 +27,6 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      - name: Install Chromium for e2e
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
