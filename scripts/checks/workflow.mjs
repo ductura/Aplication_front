@@ -35,6 +35,6 @@ export function checkWorkflow(text) {
     ...Object.entries(doc.jobs ?? {}).flatMap(([id, job]) => permissionErrors(job?.permissions, id)),
     ...refErrors(doc.jobs ?? {}, lines),
     ...triggers.filter((t) => ["pull_request_target", "workflow_run"].includes(t)).map((t) => `banned trigger: ${t}`),
-    ...(lines.some((l) => /\bsecrets\b|\bgithub\s*(\.\s*token\b|\[\s*['"]token['"]\s*\])/i.test(l)) ? ["secrets and token are not allowed"] : []),
+    ...(lines.some((l) => /\bsecrets\b|tojson\s*\(\s*github\s*\)|\bgithub\s*(\.\s*token\b|\[\s*['"]token['"]\s*\])/i.test(l)) ? ["secrets and token are not allowed"] : []),
   ];
 }

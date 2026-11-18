@@ -16,6 +16,9 @@ describe("forbidden terms scanner (PRODUCT.md §5, D-276)", () => {
     "dokaz autorstva", "Ovo je neobično dug naziv.", "Institucija je spremljena.", "Kopiraj navod — kopirano",
     "40 % ljudskog teksta", "Podrijetlo: 60 %", "izvor 30 %", "40 % teksta je AI", "AI-generirano 40 %", "AI40%",
     "plagiat", "udjel AI", "skrivanje", "nedostaje podataka", "nestalo podataka", "upozorenje za studenta",
+    "sum\ufe0fnjivo", "sum\u20d2njivo", "40%AI", "60%podrijetlo", "Autorstvo je verificirano", "Čovjek je napisao",
+    "AI ga je napisao", "Udio ljudskog teksta", "Data vanished", "40 % UI", "40 % umjetne inteligencije", "Vjerovatno",
+    "40 percent AI", "AI-generated", "plag\u0131jat", "Ri\u0237ik",
     "neizvorno", "\u0455umnjiv\u043e", "\ua731umnjivo", "su\u0359mnjivo",
   ])("reports %s", (text) => {
     expect(hit(text)).toEqual([expect.objectContaining({ key: "a.b" })]);
@@ -27,6 +30,7 @@ describe("forbidden terms scanner (PRODUCT.md §5, D-276)", () => {
     "spremljena na uređaju", "Nedostaje naziv", "Izgubljena veza", "Integracija", "Spremi", "sprema se",
     "Neispravan broj", "asterisk", "Authentication", "Dodaj instituciju", "Broj računa za studente",
     "Spremljene promjene na poslužitelju", "Najviše 100000 računa", "Izvor: Ductura",
+    "Prijava nije uspjela", "Server nije dostupan", "Pokušajte ponovno za 30 sekundi", "2 AI pružatelja",
   ])("allows %s", (text) => {
     expect(hit(text)).toEqual([]);
   });

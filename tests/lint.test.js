@@ -20,6 +20,7 @@ describe("UI text must come from the catalogue (real eslint.config.mjs)", () => 
     ['<input placeholder={x ? "Broj" : ""} />', TEXT], ['<img alt="Znak" src="/a.png" />', TEXT],
     ['<Field label="Broj" />', TEXT], ['<input value="Pošalji" readOnly />', TEXT], ['<input defaultValue="Broj" />', TEXT],
     ["<p dangerouslySetInnerHTML={{ __html: x }} />", "react/no-danger"],
+    ['<input {...{ placeholder: "Broj" }} />', TEXT], ["<p {...{ dangerouslySetInnerHTML: { __html: x } }} />", TEXT],
     ['<Field label={<p>{x ? "Da" : "Ne"}</p>} />', TEXT], ['<Field render={() => <p>{"Da".trim()}</p>} />', TEXT],
   ])("fails on %s", async (jsx, rule) => {
     expect(await ruleIds(component(jsx))).toContain(rule);
@@ -33,6 +34,7 @@ describe("UI text must come from the catalogue (real eslint.config.mjs)", () => 
   it("fails on literal metadata text; the repository has no .cjs files", async () => {
     expect(await ruleIds('export const metadata = { title: "Ductura" };\n')).toContain(TEXT);
     expect(await ruleIds('export function generateMetadata() { return { title: `Ductura` }; }\n')).toContain(TEXT);
+    expect(await ruleIds('export const generateMetadata = () => ({ title: "Ductura" });\n')).toContain(TEXT);
     const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" });
     expect(files.split("\n").filter((f) => f.endsWith(".cjs"))).toEqual([]);
   });

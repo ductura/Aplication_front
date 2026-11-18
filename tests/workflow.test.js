@@ -30,7 +30,7 @@ describe("workflow checker", () => {
     ["pull_request_target", ok.replace("pull_request]", "pull_request_target]")],
     ["workflow_run", ok.replace("pull_request]", "workflow_run]")],
     ["secrets dot", env("secrets.TOKEN")], ["secrets index", env("secrets['TOKEN']")],
-    ["secrets upper case", env("SECRETS.TOKEN")], ["github token", env("github.token")], ["github token index", env("github['token']")],
+    ["secrets upper case", env("SECRETS.TOKEN")], ["github token", env("github.token")], ["github token index", env("github['token']")], ["github context", env("toJSON(github)")],
     ["local action", step("./.github/actions/x")], ["non-string uses", step("{ a: 1 }")],
     ["service image tag", `${ok}    services:\n      db:\n        image: postgres:latest\n`],
     ["container tag", ok.replace("    runs-on", "    container: node:26\n    runs-on")],

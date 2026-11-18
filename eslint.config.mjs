@@ -18,10 +18,12 @@ const config = [
       "no-restricted-syntax": [
         "error",
         { selector: `JSXAttribute[name.name=${TEXT_PROPS}] ${TEXT}`, message },
+        { selector: `JSXSpreadAttribute Property[key.name=${TEXT_PROPS}] ${TEXT}`, message },
+        { selector: 'JSXSpreadAttribute Property[key.name="dangerouslySetInnerHTML"]', message },
         { selector: `:matches(JSXElement, JSXFragment) > JSXExpressionContainer ${TEXT}:not(JSXAttribute *)`, message },
         { selector: `JSXAttribute :matches(JSXElement, JSXFragment) > JSXExpressionContainer ${TEXT}`, message },
         {
-          selector: `:matches(VariableDeclarator[id.name="metadata"], FunctionDeclaration[id.name="generateMetadata"]) ${TEXT}`,
+          selector: `:matches(VariableDeclarator, FunctionDeclaration)[id.name=/^(metadata|generateMetadata)$/] ${TEXT}`,
           message,
         },
       ],

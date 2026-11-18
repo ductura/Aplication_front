@@ -30,11 +30,14 @@ it.each([
   [".a { border-radius: var(--x, 12px); }"], [".a { outline: 2px solid var(--accent); }"], [".a { outline-offset: 2px; }"],
   [".a { outline: 0.2rem solid var(--accent); }"], [".a { outline-width: thick; }"],
   ['.a::after { content: "Spremljeno"; }'], [".a::after { content: attr(data-x); }"], [".a { --x: red; }"],
+  [".a { background: linear-gradient(red, blue); }"], [".b { color: red; /* { */ }"], [".b { /* } */ color: red; }"],
+  [".a { color: var(--x, red); }"], [".a { stop-color: red; }"], [".a { filter: drop-shadow(0 0 2px red); }"],
 ])("CSS module check rejects %s", (css) => expect(checkModuleCss(css)).not.toEqual([]));
 
 it("CSS module check accepts tokens and ignores selectors; every real module is token-only", () => {
   expect(checkModuleCss(".outline:hover { border: 1px solid var(--rule); border-radius: var(--radius); }")).toEqual([]);
   expect(checkModuleCss(".a { background-size: cover; border-collapse: collapse; text-decoration: underline; content: ''; }")).toEqual([]);
+  expect(checkModuleCss(".a { background: linear-gradient(var(--ink), var(--accent)); }")).toEqual([]);
   const plain = ["app", "src"].flatMap((d) => readdirSync(d, { recursive: true }).map((f) => `${d}/${f}`));
   expect(plain.filter((f) => f.endsWith(".css") && !f.endsWith(".module.css"))).toEqual(["app/globals.css"]);
   const mods = ["app", "src"].flatMap((d) =>
