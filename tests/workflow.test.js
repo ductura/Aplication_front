@@ -12,7 +12,6 @@ jobs:
     steps:
       # uses: actions/cache@main
       - uses: actions/checkout@${sha} # v7.0.1
-      - uses: ./.github/actions/local
 `;
 const perm = (p) => ok.replace("permissions:\n  contents: read", p);
 const env = (v) => `${ok}        env:\n          T: \${{ ${v} }}\n`;
@@ -31,6 +30,12 @@ describe("workflow checker", () => {
     ["pull_request_target", ok.replace("pull_request]", "pull_request_target]")],
     ["workflow_run", ok.replace("pull_request]", "workflow_run]")],
     ["secrets dot", env("secrets.TOKEN")], ["secrets index", env("secrets['TOKEN']")],
+    ["secrets upper case", env("SECRETS.TOKEN")], ["github token", env("github.token")],
+    ["local action", step("./.github/actions/x")], ["non-string uses", step("{ a: 1 }")],
+    ["service image tag", `${ok}    services:\n      db:\n        image: postgres:latest\n`],
+    ["container tag", ok.replace("    runs-on", "    container: node:26\n    runs-on")],
+    ["map trigger", ok.replace("on: [push, pull_request]", "on:\n  pull_request_target:\n    types: [opened]")],
+    ["no triggers", ok.replace("on: [push, pull_request]\n", "")], ["YAML 1.1", `%YAML 1.1\n---\n${ok}`],
   ])("rejects %s", (_, text) => {
     expect(checkWorkflow(text)).not.toEqual([]);
   });
@@ -38,6 +43,7 @@ describe("workflow checker", () => {
   it("accepts a pinned read-only workflow", () => {
     expect(checkWorkflow(ok)).toEqual([]);
     expect(checkWorkflow(step(`docker://alpine@sha256:${"a".repeat(64)}`))).toEqual([]);
+    expect(checkWorkflow(ok.replace("    runs-on", `    container: node@sha256:${"b".repeat(64)}\n    runs-on`))).toEqual([]);
   });
 
   it("every real workflow passes and CI runs install, lint, test and build", () => {
