@@ -11,7 +11,7 @@ const config = [
   { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "off" } },
   ...next,
   {
-    files: ["**/*.{js,jsx,mjs,cjs}"],
+    files: ["**/*.{js,jsx,mjs}"],
     rules: {
       "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
       "react/no-danger": "error",
@@ -19,6 +19,11 @@ const config = [
         "error",
         { selector: `JSXAttribute[name.name=${TEXT_PROPS}] ${TEXT}`, message },
         { selector: `:matches(JSXElement, JSXFragment) > JSXExpressionContainer ${TEXT}:not(JSXAttribute *)`, message },
+        { selector: `JSXAttribute :matches(JSXElement, JSXFragment) > JSXExpressionContainer ${TEXT}`, message },
+        {
+          selector: `:matches(VariableDeclarator[id.name="metadata"], FunctionDeclaration[id.name="generateMetadata"]) ${TEXT}`,
+          message,
+        },
       ],
     },
   },

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { ESLint } from "eslint";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +20,7 @@ describe("UI text must come from the catalogue (real eslint.config.mjs)", () => 
     ['<input placeholder={x ? "Broj" : ""} />', TEXT], ['<img alt="Znak" src="/a.png" />', TEXT],
     ['<Field label="Broj" />', TEXT], ['<input value="Pošalji" readOnly />', TEXT], ['<input defaultValue="Broj" />', TEXT],
     ["<p dangerouslySetInnerHTML={{ __html: x }} />", "react/no-danger"],
+    ['<Field label={<p>{x ? "Da" : "Ne"}</p>} />', TEXT], ['<Field render={() => <p>{"Da".trim()}</p>} />', TEXT],
   ])("fails on %s", async (jsx, rule) => {
     expect(await ruleIds(component(jsx))).toContain(rule);
   });
@@ -26,6 +28,13 @@ describe("UI text must come from the catalogue (real eslint.config.mjs)", () => 
   it("fails on literal text in a .mjs component and ignores eslint-disable comments", async () => {
     expect(await ruleIds(component("<p>Sumnjivo</p>"), "app/bad.mjs")).toContain("react/jsx-no-literals");
     expect(await ruleIds(`/* eslint-disable */\n${component("<p>Da</p>")}`)).toContain("react/jsx-no-literals");
+  });
+
+  it("fails on literal metadata text; the repository has no .cjs files", async () => {
+    expect(await ruleIds('export const metadata = { title: "Ductura" };\n')).toContain(TEXT);
+    expect(await ruleIds('export function generateMetadata() { return { title: `Ductura` }; }\n')).toContain(TEXT);
+    const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" });
+    expect(files.split("\n").filter((f) => f.endsWith(".cjs"))).toEqual([]);
   });
 
   it("catalogue text, lang, className, key and href pass", async () => {
