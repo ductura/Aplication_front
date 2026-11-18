@@ -90,6 +90,22 @@ it("detail page shows the instance state and the accounts", async () => {
   expect(nema).toContain(hr.instanca.nema);
 });
 
+it("detail page shows a refused instance with its reason and a failed attempt in progress", async () => {
+  const sa = (provisioning) => {
+    odgovori["/api/admin/institutions"] = [200, { institucije: [{ ...INST, provisioning: { ...INST.provisioning, ...provisioning } }] }];
+    return Institucija({ params: Promise.resolve({ id: INST.id }) }).then(renderToStaticMarkup);
+  };
+  const odbijena = await sa({ stanje: "greska", kodGreske: "slug_zauzet", zadnjaGreska: "409", pokusaja: 1 });
+  expect(odbijena).toContain(hr.instanca.stanja.greska);
+  expect(odbijena).toContain(hr.instanca.kodovi.slug_zauzet);
+  expect(odbijena).not.toContain(hr.instanca.osvjezava);
+  const ponovno = await sa({ stanje: "u_izradi", zadnjaGreska: "503", pokusaja: 2 });
+  expect(ponovno).toContain(hr.instanca.neuspjeliPokusaj(2));
+  expect(ponovno).toContain(hr.instanca.osvjezava);
+  const aktivna = await sa({ stanje: "aktivna", aktivirano: "2026-11-18T22:05:00Z" });
+  expect(aktivna).not.toContain(hr.instanca.osvjezava);
+});
+
 it("an unreachable server shows a message instead of data", async () => {
   vi.stubGlobal("fetch", async () => {
     throw new TypeError("fetch failed");

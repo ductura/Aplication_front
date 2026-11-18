@@ -143,6 +143,20 @@ test("shows errors per field: invalid input, taken faculty and taken domain", as
   await expect(page.getByRole("heading", { level: 1, name: "Filozofski fakultet" })).toBeVisible();
 });
 
+test("a refused instance shows the reason and stops refreshing", async ({ page }) => {
+  await prijavi(page);
+  await page.getByRole("button", { name: hr.institucije.dodaj }).click();
+  await page.getByLabel(o.fakultet).selectOption("pmf");
+  await page.getByLabel(o.domena).fill("odbijena.pmf.hr");
+  await page.getByRole("button", { name: o.posalji }).click();
+  const stanje = page.getByRole("status");
+  await expect(stanje).toContainText(hr.instanca.stanja.zatrazena);
+  await expect(stanje).toContainText(hr.instanca.stanja.greska, { timeout: 15_000 });
+  await expect(page.getByText(hr.instanca.kodovi.domena_zauzeta)).toBeVisible();
+  await expect(page.getByText(hr.instanca.osvjezava)).toHaveCount(0);
+  await bezOzbiljnihNalaza(page);
+});
+
 test("logout ends the session", async ({ page }) => {
   await prijavi(page);
   await page.getByRole("button", { name: hr.traka.odjava }).click();

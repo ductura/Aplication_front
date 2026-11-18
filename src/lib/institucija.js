@@ -10,7 +10,9 @@ export const ULOGE = Object.freeze([
   Object.freeze(["institution_admin", 1, 20]),
 ]);
 
-export const STANJA = Object.freeze(["zatrazena", "u_izradi", "aktivna"]);
+export const STANJA = Object.freeze(["zatrazena", "u_izradi", "aktivna", "greska"]);
+// These can still change (institutions/podigni.js on Aplication_server); aktivna and greska are final.
+export const U_TIJEKU = Object.freeze(["zatrazena", "u_izradi"]);
 
 const HOME_ORG = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
