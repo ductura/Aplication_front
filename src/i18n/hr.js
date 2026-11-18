@@ -69,15 +69,24 @@ export const hr = {
     },
   },
   instanca: {
-    stanja: { zatrazena: "zatražena", u_izradi: "u izradi", aktivna: "aktivna" },
+    stanja: { zatrazena: "zatražena", u_izradi: "u izradi", aktivna: "aktivna", greska: "odbijena" },
     natrag: "← Sve institucije",
     stanje: "Stanje instance",
     opis: {
       zatrazena: "Zahtjev za instancu je zapisan i čeka podizanje na poslužitelju institucije.",
       u_izradi: "Instanca se podiže na poslužitelju institucije.",
       aktivna: "Instanca je aktivna. Računi ove institucije mogu se prijaviti preko AAI@EduHr.",
+      greska: "Poslužitelj institucije odbio je zahtjev. Instanca se neće podići iz ovog zahtjeva.",
+    },
+    kodovi: {
+      slug_zauzet: "Oznaka institucije već je zauzeta na poslužitelju institucije.",
+      domena_zauzeta: "AAI domena već je zauzeta na poslužitelju institucije.",
+      neispravan_unos: "Poslužitelj institucije nije prihvatio podatke institucije.",
     },
     osvjezava: "Stranica se sama osvježava dok instanca ne postane aktivna.",
+    neuspjeliPokusaj: (n) =>
+      `Zadnji pokušaj slanja poslužitelju institucije nije uspio (pokušaja: ${n}). Zahtjev čeka ponovno slanje.`,
+    pokusaja: "Pokušaja slanja",
     podaci: "Podaci institucije",
     slug: "Oznaka",
     domena: "AAI domena",

@@ -2,7 +2,9 @@
 // invented data: one admin, a few faculties, institutions in memory. The
 // routes and fields follow ductura/Aplication_server (institutions/stvori.js)
 // and ugovor c.6993786629 §3.4. Each GET of the list moves a new instance one
-// state forward (zatrazena -> u_izradi -> aktivna) so the detail page can be tested.
+// state forward (zatrazena -> u_izradi -> aktivna) so the detail page can be tested;
+// a domain starting with "odbijena." ends in greska (domena_zauzeta), as
+// Aplication_server records a final refusal of Institution_server.
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
@@ -65,7 +67,7 @@ function stvori(ulaz) {
     issuer: "http://localhost:8090",
     racuni: Object.fromEntries(Object.entries(racuni).filter(([, n]) => n > 0)),
     stvorena: sada,
-    provisioning: { stanje: "zatrazena", zatrazeno: sada, aktivirano: null },
+    provisioning: { stanje: "zatrazena", zatrazeno: sada, aktivirano: null, kodGreske: null, zadnjaGreska: null, pokusaja: 0 },
   };
   institucije.push(inst);
   return [201, { institucija: inst }];
@@ -105,7 +107,10 @@ const server = createServer(async (req, res) => {
     const odgovor = { institucije: structuredClone(institucije) };
     for (const i of institucije) {
       const p = i.provisioning;
-      if (SLJEDECE[p.stanje]) p.stanje = SLJEDECE[p.stanje];
+      if (p.stanje === "u_izradi" && i.aaiDomena.startsWith("odbijena.")) {
+        Object.assign(p, { stanje: "greska", kodGreske: "domena_zauzeta", zadnjaGreska: "409 domena_zauzeta" });
+      } else if (SLJEDECE[p.stanje]) p.stanje = SLJEDECE[p.stanje];
+      p.pokusaja += 1;
       if (p.stanje === "aktivna" && !p.aktivirano) p.aktivirano = new Date().toISOString();
     }
     return posalji(res, 200, odgovor);

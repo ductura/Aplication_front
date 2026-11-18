@@ -6,7 +6,7 @@ import StanjeInstance from "../../../src/components/StanjeInstance.jsx";
 import Traka from "../../../src/components/Traka.jsx";
 import ui from "../../../src/components/ui.module.css";
 import { hr } from "../../../src/i18n/hr.js";
-import { ULOGE } from "../../../src/lib/institucija.js";
+import { U_TIJEKU, ULOGE } from "../../../src/lib/institucija.js";
 import { dohvatiInstitucije, dohvatiSesiju } from "../../../src/server/podaci.js";
 import styles from "../../page.module.css";
 
@@ -24,7 +24,9 @@ export default async function Institucija({ params }) {
   if (institucije === "odjavljen") redirect("/prijava");
   if (institucije === "nedostupan") return <Nedostupno admin={sesija.admin} />;
   const i = institucije.find((x) => x.id === id);
-  const stanje = i?.provisioning?.stanje;
+  const p = i?.provisioning ?? {};
+  const stanje = p.stanje;
+  const pokusaja = Number.isSafeInteger(p.pokusaja) ? p.pokusaja : null;
 
   return (
     <>
@@ -45,7 +47,13 @@ export default async function Institucija({ params }) {
               <p className={ui.stanjeRed} role="status">
                 <StanjeInstance stanje={stanje} /> <span>{t.opis[stanje] ?? ""}</span>
               </p>
-              {stanje !== "aktivna" && (
+              {stanje === "greska" && (
+                <p className={ui.greska}>{t.kodovi[p.kodGreske] ?? t.kodovi.neispravan_unos}</p>
+              )}
+              {stanje === "u_izradi" && p.zadnjaGreska && pokusaja > 0 && (
+                <p className={ui.pomoc}>{t.neuspjeliPokusaj(pokusaja)}</p>
+              )}
+              {U_TIJEKU.includes(stanje) && (
                 <>
                   <p className={ui.pomoc}>{t.osvjezava}</p>
                   <Osvjezavanje />
@@ -60,9 +68,15 @@ export default async function Institucija({ params }) {
                 <dt>{t.issuer}</dt>
                 <dd>{i.issuer}</dd>
                 <dt>{t.zatrazeno}</dt>
-                <dd>{vrijeme(i.provisioning?.zatrazeno)}</dd>
+                <dd>{vrijeme(p.zatrazeno)}</dd>
                 <dt>{t.aktivirano}</dt>
-                <dd>{vrijeme(i.provisioning?.aktivirano)}</dd>
+                <dd>{vrijeme(p.aktivirano)}</dd>
+                {pokusaja !== null && (
+                  <>
+                    <dt>{t.pokusaja}</dt>
+                    <dd>{pokusaja}</dd>
+                  </>
+                )}
               </dl>
               <h2>{t.racuni}</h2>
               <dl className={ui.podaci}>
