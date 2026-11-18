@@ -4,8 +4,11 @@
   --chrome: #292a28;
   --ink: #faf9f5;
   --ink-2: #dedbd3;
+  --ink-3: #c9c5bb;
   --rule: #8c887f;
+  --hover: #3a3a36;
   --accent: #c8aa6e;
+  --radius-control: 5px;
   --radius: 6px;
   --focus-width: 3px;
   --focus-offset: 4px;
@@ -14,11 +17,24 @@
   color-scheme: dark;
 }
 
+/* The white sheet sits in the dark shell, so the values the design system
+   inherits from the shell ("·") are taken from the light shell here: --error
+   and --hover on paper must stay readable. */
 .sheet[data-sheet-theme="light"] {
   --sheet: #fcfbf8;
   --ink: #242422;
   --ink-2: #55534d;
+  --ink-3: #5c5a54;
+  --rule: #cfccc4;
+  --well: #efede7;
+  --hover: #ecebe5;
   --accent: #806529;
+  --accent-hover: #6b5420;
+  --accent-ink: #fcfbf8;
+  --field: #fcfbf8;
+  --field-rule: #85827a;
+  --error: #9c3f33;
+  color-scheme: light;
 }
 
 body {
