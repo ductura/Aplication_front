@@ -1,31 +1,22 @@
-.shell {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-}
-
 .bar {
+  padding: 12px 24px;
   background: var(--chrome);
   border-bottom: 1px solid var(--rule);
-  padding: 12px 24px;
   font: 500 16px/1.5 var(--ff-display);
 }
 
 .sheet {
+  box-sizing: border-box;
   max-width: 720px;
   margin: 32px auto;
   padding: 40px;
   background: var(--sheet);
-  color: var(--ink);
+  color: var(--ink-2);
   border-radius: var(--radius);
 }
 
 .sheet h1 {
   margin: 0 0 12px;
+  color: var(--ink);
   font: 400 40px/1.08 var(--ff-display);
-}
-
-.sheet p {
-  margin: 0;
-  color: var(--ink-2);
 }

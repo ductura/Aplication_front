@@ -1,5 +1,4 @@
-/* "Papir i grafit" (D-188), values from Ductus docs/design/DESIGN-SYSTEM.md §3 and §5.
-   Only the tokens this app uses; tests/css.test.js compares them per scope. */
+/* "Papir i grafit" (D-188), Ductus docs/design/DESIGN-SYSTEM.md §3 and §5. Only used tokens. */
 :root {
   --ground: #242422;
   --chrome: #292a28;
@@ -7,7 +6,6 @@
   --ink-2: #dedbd3;
   --rule: #8c887f;
   --accent: #c8aa6e;
-  --accent-ink: #242422;
   --radius: 6px;
   --focus-width: 3px;
   --focus-offset: 4px;
@@ -20,18 +18,11 @@
   --sheet: #fcfbf8;
   --ink: #242422;
   --ink-2: #55534d;
-  --rule: #cfccc4;
   --accent: #806529;
-  --accent-ink: #fcfbf8;
-}
-
-* {
-  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
   background: var(--ground);
   color: var(--ink);
   font: 400 13.5px/1.5 var(--ff-ui);

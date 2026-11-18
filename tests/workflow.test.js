@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 import { checkWorkflow } from "../scripts/checks/workflow.mjs";
 
 const sha = "3d3c42e5aac5ba805825da76410c181273ba90b1";
-const ok = `on:
-  push:
-  pull_request:
+const ok = `on: [push, pull_request]
 permissions:
   contents: read
 jobs:
@@ -16,6 +14,8 @@ jobs:
       - uses: actions/checkout@${sha} # v7.0.1
       - uses: ./.github/actions/local
 `;
+const perm = (p) => ok.replace("permissions:\n  contents: read", p);
+const env = (v) => `${ok}        env:\n          T: \${{ ${v} }}\n`;
 const step = (u) => ok.replace(`actions/checkout@${sha} # v7.0.1`, u);
 
 describe("workflow checker", () => {
@@ -24,16 +24,13 @@ describe("workflow checker", () => {
     ["short sha", step(`actions/checkout@${sha.slice(0, 7)} # v7`)], ["quoted tag", step('"actions/checkout@v7"')],
     ["missing version comment", step(`actions/checkout@${sha}`)], ["docker tag", step("docker://alpine:3")],
     ["reusable workflow tag", `${ok}  call:\n    uses: o/r/.github/workflows/x.yml@v1\n`],
-    ["no top-level permissions", ok.replace("permissions:\n  contents: read\n", "")],
-    ["write-all", ok.replace("permissions:\n  contents: read", "permissions: write-all")],
-    ["read-all", ok.replace("permissions:\n  contents: read", "permissions: read-all")],
-    ["write scope", ok.replace("contents: read", "contents: write")],
-    ["flow map write", ok.replace("permissions:\n  contents: read", "permissions: { contents: write }")],
+    ["no top-level permissions", perm("")], ["write-all", perm("permissions: write-all")],
+    ["read-all", perm("permissions: read-all")], ["write scope", perm("permissions:\n  contents: write")],
+    ["flow map write", perm("permissions: { contents: write }")],
     ["job-level write", ok.replace("    runs-on", "    permissions:\n      id-token: write\n    runs-on")],
-    ["pull_request_target", ok.replace("pull_request:", "pull_request_target:")],
-    ["workflow_run", ok.replace("pull_request:", "workflow_run:")],
-    ["secrets dot", `${ok}        env:\n          T: \${{ secrets.TOKEN }}\n`],
-    ["secrets index", `${ok}        env:\n          T: \${{ secrets['TOKEN'] }}\n`],
+    ["pull_request_target", ok.replace("pull_request]", "pull_request_target]")],
+    ["workflow_run", ok.replace("pull_request]", "workflow_run]")],
+    ["secrets dot", env("secrets.TOKEN")], ["secrets index", env("secrets['TOKEN']")],
   ])("rejects %s", (_, text) => {
     expect(checkWorkflow(text)).not.toEqual([]);
   });
