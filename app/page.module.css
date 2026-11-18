@@ -20,3 +20,7 @@
   color: var(--ink);
   font: 400 40px/1.08 var(--ff-display);
 }
+
+.sheet a {
+  color: var(--accent);
+}

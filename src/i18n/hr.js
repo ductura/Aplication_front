@@ -5,4 +5,5 @@ export const hr = {
     heading: "Administracija",
     lead: "Ovdje će administrator dodavati institucije i broj računa za njihove korisnike.",
   },
+  notFound: { heading: "Stranica ne postoji", back: "Natrag na početnu stranicu" },
 };

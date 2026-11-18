@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import RootLayout, { metadata } from "../app/layout.jsx";
+import NotFound from "../app/not-found.jsx";
 import Page from "../app/page.jsx";
 import { hr } from "../src/i18n/hr.js";
 
@@ -19,4 +20,10 @@ it("home page shows the product name and a near-white sheet", () => {
 it("repository has no TypeScript", () => {
   const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" });
   expect(files.split("\n").filter((f) => /\.(ts|tsx|mts|cts)$|(^|\/)tsconfig[^/]*\.json$/.test(f))).toEqual([]);
+});
+
+it("404 page uses catalogue text and links home", () => {
+  const html = renderToStaticMarkup(<NotFound />);
+  expect(html).toContain(hr.notFound.heading);
+  expect(html).toMatch(new RegExp(`<a href="/"[^>]*>${hr.notFound.back}</a>`));
 });
