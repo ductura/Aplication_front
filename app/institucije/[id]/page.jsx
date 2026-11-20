@@ -10,6 +10,8 @@ import { U_TIJEKU, ULOGE } from "../../../src/lib/institucija.js";
 import { dohvatiInstitucije, dohvatiSesiju } from "../../../src/server/podaci.js";
 import styles from "../../page.module.css";
 
+const STANJE_GRESKA = "greska";
+const STANJE_U_IZRADI = "u_izradi";
 export const dynamic = "force-dynamic";
 
 const t = hr.instanca;
@@ -47,10 +49,10 @@ export default async function Institucija({ params }) {
               <p className={ui.stanjeRed} role="status">
                 <StanjeInstance stanje={stanje} /> <span>{t.opis[stanje] ?? ""}</span>
               </p>
-              {stanje === "greska" && (
+              {stanje === STANJE_GRESKA && (
                 <p className={ui.greska}>{t.kodovi[p.kodGreske] ?? t.kodovi.neispravan_unos}</p>
               )}
-              {stanje === "u_izradi" && p.zadnjaGreska && pokusaja > 0 && (
+              {stanje === STANJE_U_IZRADI && p.zadnjaGreska && pokusaja > 0 && (
                 <p className={ui.pomoc}>{t.neuspjeliPokusaj(pokusaja)}</p>
               )}
               {U_TIJEKU.includes(stanje) && (

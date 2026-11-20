@@ -102,5 +102,6 @@ export const hr = {
     pokusajPonovno: "Pokušaj ponovno",
   },
   notFound: { naslov: "Stranica nije pronađena.", natrag: "Natrag na administraciju" },
+  error: { heading: "Stranicu trenutačno nije moguće prikazati", retry: "Pokušaj ponovno" },
 };
 

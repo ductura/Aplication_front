@@ -1,6 +1,6 @@
 .sheet {
   box-sizing: border-box;
-  max-width: 720px;
+  width: min(720px, 100% - 48px);
   margin: 32px auto;
   padding: 40px;
   background: var(--sheet);

@@ -7,7 +7,8 @@ import { dohvatiSesiju } from "../../src/server/podaci.js";
 import styles from "../page.module.css";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: `${hr.prijava.naslov} · ${hr.app.name}` };
+const RAZDJELNIK = " · ";
+export const metadata = { title: [hr.prijava.naslov, hr.app.name].join(RAZDJELNIK) };
 
 export default async function Prijava() {
   if ((await dohvatiSesiju()).stanje === "prijavljen") redirect("/");
