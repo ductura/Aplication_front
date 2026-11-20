@@ -30,6 +30,7 @@ test.afterEach(() => {
 });
 
 async function bezOzbiljnihNalaza(page) {
+  await expect(page).toHaveTitle(hr.app.name);
   const { violations } = await new AxeBuilder({ page }).analyze();
   const ozbiljni = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(ozbiljni.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
@@ -80,6 +81,8 @@ test("login shows 401 and 429 messages, then signs in", async ({ page }) => {
 });
 
 test("adds an institution and follows its instance to active", async ({ page }) => {
+  // This scenario includes four accessibility scans and two automatic refreshes.
+  test.setTimeout(60_000);
   await prijavi(page);
   await bezOzbiljnihNalaza(page);
   await page.getByRole("button", { name: hr.institucije.dodaj }).click();
