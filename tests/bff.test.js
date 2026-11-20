@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import * as institucije from "../app/api/institucije/route.js";
-import * as odjava from "../app/api/odjava/route.js";
-import * as prijava from "../app/api/prijava/route.js";
+import * as institucije from "../app/api/v1/institucije/route.js";
+import * as odjava from "../app/api/v1/odjava/route.js";
+import * as prijava from "../app/api/v1/prijava/route.js";
 import { izvuciKolacic, kolaciciZaPreglednik } from "../src/server/aplication-server.js";
 
 let pozivi;

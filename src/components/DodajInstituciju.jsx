@@ -31,17 +31,18 @@ export default function DodajInstituciju({ fakulteti, institucije }) {
   const [aaiDomena, setAaiDomena] = useState("");
   const [predlozena, setPredlozena] = useState("");
   const [racuni, setRacuni] = useState(POCETNI);
-  const [greske, setGreske] = useState({});
+  const [greske, setGreske] = useState(/** @type {Record<string, string>} */ ({}));
   const [opca, setOpca] = useState("");
   const [saljem, setSaljem] = useState(false);
-  const obrazacRef = useRef(null);
-  const gumbRef = useRef(null);
+  const obrazacRef = useRef(/** @type {HTMLFormElement | null} */ (null));
+  const gumbRef = useRef(/** @type {HTMLButtonElement | null} */ (null));
 
   const zauzeti = new Set(institucije.map((i) => i.fakultetId));
 
   function fokusirajPrvu(polja) {
     const prvo = REDOSLIJED.find((p) => polja[p]);
-    if (prvo) obrazacRef.current?.querySelector(`#${idPolja(prvo)}`)?.focus();
+    const polje = prvo && obrazacRef.current?.querySelector(`#${idPolja(prvo)}`);
+    if (polje instanceof HTMLElement) polje.focus();
   }
 
   function odaberiFakultet(id) {
