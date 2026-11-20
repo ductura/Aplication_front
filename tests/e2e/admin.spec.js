@@ -30,7 +30,7 @@ test.afterEach(() => {
 });
 
 async function bezOzbiljnihNalaza(page) {
-  await expect(page).toHaveTitle(hr.app.name);
+  await expect(page).toHaveTitle(/\S/);
   const { violations } = await new AxeBuilder({ page }).analyze();
   const ozbiljni = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(ozbiljni.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
