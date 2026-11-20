@@ -19,7 +19,7 @@ test.beforeEach(async ({ page, request }) => {
     // their real status; only those are allowed, nothing else.
     const ocekivano =
       /^Failed to load resource: the server responded with a status of (400|401|409|429) /.test(m.text()) &&
-      /\/admin\/api\/(prijava|institucije)$/.test(m.location().url);
+      /\/admin\/api\/v1\/(prijava|institucije)$/.test(m.location().url);
     if (!ocekivano) greskeKonzole.push(m.text());
   });
   page.on("pageerror", (e) => greskeKonzole.push(String(e)));
@@ -39,7 +39,11 @@ async function prijavi(page) {
   await page.goto("/admin/prijava");
   await page.getByLabel(hr.prijava.korisnickoIme).fill(ADMIN.ime);
   await page.getByLabel(hr.prijava.lozinka).fill(ADMIN.lozinka);
+  const prijava = page.waitForResponse((res) =>
+    new URL(res.url()).pathname === "/admin/api/v1/prijava" && res.request().method() === "POST",
+  );
   await page.getByRole("button", { name: hr.prijava.posalji }).click();
+  expect((await prijava).status()).toBe(204);
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole("heading", { name: hr.home.heading })).toBeVisible();
 }
@@ -82,8 +86,8 @@ test("adds an institution and follows its instance to active", async ({ page }) 
   await expect(page.getByLabel(o.fakultet)).toBeFocused();
   await expect(page.getByText(o.napomena)).toBeVisible();
 
-  await page.getByLabel(o.fakultet).selectOption("fpzg");
-  await expect(page.getByLabel(o.domena)).toHaveValue("fpzg.hr");
+  await page.getByLabel(o.fakultet).selectOption("demo-jantar");
+  await expect(page.getByLabel(o.domena)).toHaveValue("demo-jantar.example");
   await page.getByLabel(o.uloge.student).fill("200");
   await page.getByLabel(o.uloge.teacher).fill("50");
   await page.getByLabel(o.uloge.network_engineer).fill("3");
@@ -92,7 +96,7 @@ test("adds an institution and follows its instance to active", async ({ page }) 
   await page.getByRole("button", { name: o.posalji }).click();
 
   await expect(page).toHaveURL(/\/admin\/institucije\/[0-9a-f-]{36}$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Fakultet političkih znanosti" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Fakultet Jantar" })).toBeVisible();
   const stanje = page.getByRole("status");
   await expect(stanje).toContainText(hr.instanca.stanja.zatrazena);
   await bezOzbiljnihNalaza(page);
@@ -101,27 +105,27 @@ test("adds an institution and follows its instance to active", async ({ page }) 
   await expect(page.getByText(hr.instanca.osvjezava)).toHaveCount(0);
 
   await page.getByRole("link", { name: hr.instanca.natrag }).click();
-  const red = page.getByRole("row", { name: /Fakultet političkih znanosti/ });
-  await expect(red.getByRole("cell")).toHaveText(["fpzg.hr", "200", "50", "3", "1", hr.instanca.stanja.aktivna]);
+  const red = page.getByRole("row", { name: /Fakultet Jantar/ });
+  await expect(red.getByRole("cell")).toHaveText(["demo-jantar.example", "200", "50", "3", "1", hr.instanca.stanja.aktivna]);
   await bezOzbiljnihNalaza(page);
 });
 
 test("shows errors per field: invalid input, taken faculty and taken domain", async ({ page }) => {
   await prijavi(page);
   await page.getByRole("button", { name: hr.institucije.dodaj }).click();
-  await page.getByLabel(o.fakultet).selectOption("fpzg");
+  await page.getByLabel(o.fakultet).selectOption("demo-jantar");
   await page.getByRole("button", { name: o.posalji }).click();
   await expect(page).toHaveURL(/\/admin\/institucije\//);
   await page.goto("/admin");
 
   await page.getByRole("button", { name: hr.institucije.dodaj }).click();
-  await expect(page.getByRole("option", { name: o.vecDodan("Fakultet političkih znanosti") })).toBeDisabled();
+  await expect(page.getByRole("option", { name: o.vecDodan("Fakultet Jantar") })).toBeDisabled();
 
   await page.getByRole("button", { name: o.posalji }).click();
   await expect(page.getByText(o.greske.fakultetObavezan)).toBeVisible();
   await expect(page.getByLabel(o.fakultet)).toBeFocused();
 
-  await page.getByLabel(o.fakultet).selectOption("ffzg");
+  await page.getByLabel(o.fakultet).selectOption("demo-sjever");
   await page.getByLabel(o.domena).fill("ne valja");
   await page.getByLabel(o.uloge.institution_admin).fill("0");
   await page.getByRole("button", { name: o.posalji }).click();
@@ -131,23 +135,23 @@ test("shows errors per field: invalid input, taken faculty and taken domain", as
   await bezOzbiljnihNalaza(page);
 
   // 409 from the server: the domain belongs to an existing institution.
-  await page.getByLabel(o.domena).fill("FPZG.hr");
+  await page.getByLabel(o.domena).fill("DEMO-JANTAR.example");
   await page.getByLabel(o.uloge.institution_admin).fill("1");
   await page.getByRole("button", { name: o.posalji }).click();
   await expect(page.getByText(o.greske.domenaZauzeta)).toBeVisible();
   await expect(page.getByLabel(o.domena)).toBeFocused();
 
   // Corrected input goes through.
-  await page.getByLabel(o.domena).fill("ffzg.hr");
+  await page.getByLabel(o.domena).fill("demo-sjever.example");
   await page.getByRole("button", { name: o.posalji }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Filozofski fakultet" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Fakultet Sjever" })).toBeVisible();
 });
 
 test("a refused instance shows the reason and stops refreshing", async ({ page }) => {
   await prijavi(page);
   await page.getByRole("button", { name: hr.institucije.dodaj }).click();
-  await page.getByLabel(o.fakultet).selectOption("pmf");
-  await page.getByLabel(o.domena).fill("odbijena.pmf.hr");
+  await page.getByLabel(o.fakultet).selectOption("demo-otok");
+  await page.getByLabel(o.domena).fill("odbijena.demo-otok.example");
   await page.getByRole("button", { name: o.posalji }).click();
   const stanje = page.getByRole("status");
   await expect(stanje).toContainText(hr.instanca.stanja.zatrazena);

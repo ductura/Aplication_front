@@ -8,8 +8,6 @@ import ui from "./ui.module.css";
 
 const t = hr.obrazac;
 const POCETNI = { student: "0", teacher: "0", network_engineer: "0", institution_admin: "1" };
-/** @type {Record<string, string>} */
-const POCETNE_GRESKE = {};
 const REDOSLIJED = ["fakultetId", "aaiDomena", ...ULOGE.map(([u]) => `racuni.${u}`)];
 
 // Error code per field (src/lib/institucija.js and the BFF) -> text.
@@ -33,7 +31,7 @@ export default function DodajInstituciju({ fakulteti, institucije }) {
   const [aaiDomena, setAaiDomena] = useState("");
   const [predlozena, setPredlozena] = useState("");
   const [racuni, setRacuni] = useState(POCETNI);
-  const [greske, setGreske] = useState(POCETNE_GRESKE);
+  const [greske, setGreske] = useState(/** @type {Record<string, string>} */ ({}));
   const [opca, setOpca] = useState("");
   const [saljem, setSaljem] = useState(false);
   const obrazacRef = useRef(/** @type {HTMLFormElement | null} */ (null));

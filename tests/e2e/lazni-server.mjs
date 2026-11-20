@@ -12,9 +12,9 @@ const PORT = Number(process.env.LAZNI_PORT ?? 3199);
 const ADMIN = { korisnickoIme: "admin-test", lozinka: "lozinka-samo-za-test" };
 const ZAKLJUCAN = "zakljucan-test"; // always 429
 const FAKULTETI = [
-  { id: "fpzg", naziv: "Fakultet političkih znanosti", web: "http://www.fpzg.hr" },
-  { id: "ffzg", naziv: "Filozofski fakultet", web: "http://www.ffzg.hr" },
-  { id: "pmf", naziv: "Prirodoslovno-matematički fakultet", web: "http://www.pmf.hr" },
+  { id: "demo-jantar", naziv: "Fakultet Jantar", web: "http://www.demo-jantar.example" },
+  { id: "demo-sjever", naziv: "Fakultet Sjever", web: "http://www.demo-sjever.example" },
+  { id: "demo-otok", naziv: "Fakultet Otok", web: "http://www.demo-otok.example" },
 ];
 const ULOGE = { student: [0, 50_000], teacher: [0, 5_000], institution_admin: [1, 20], network_engineer: [0, 20] };
 const HOME_ORG = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
