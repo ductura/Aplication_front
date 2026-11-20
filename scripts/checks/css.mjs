@@ -9,7 +9,8 @@ const RULES = [
     COLOR_PROPS,
     (v) => v.replace(/var\([^)]*\)/g, "").split(/[\s,/]+/).some((w) => /^[a-z-]+$/i.test(w) && !KEYWORDS.test(w)),
   ],
-  [/^outline/i, (v) => /\d|\b(thin|medium|thick)\b/i.test(v.replace(/var\(--[\w-]+\)/g, ""))],
+  // The global :focus-visible ring is the only outline; modules never write or suppress one.
+  [/^outline/i, () => true],
   [/radius/i, (v) => !/^(var\(--[\w-]+\)|999px|50%)$/.test(v)],
   [/^content$/i, (v) => !/^(""|''|none)$/.test(v)],
 ];

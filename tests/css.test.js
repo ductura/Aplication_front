@@ -36,7 +36,7 @@ it.each([
   [".a { color: color-mix(in srgb, var(--ink), var(--accent)); }"], [".a { border: 1px solid red; }"],
   [".a { border-radius : 8px; }"], [".a { border-top-left-radius: 8px; }"], [".a { border-radius: 999px 2px; }"],
   [".a { border-radius: var(--x, 12px); }"], [".a { outline: 2px solid var(--accent); }"], [".a { outline-offset: 2px; }"],
-  [".a { outline: 0.2rem solid var(--accent); }"], [".a { outline-width: thick; }"],
+  [".a { outline: 0.2rem solid var(--accent); }"], [".a { outline-width: thick; }"], [".a:focus-visible { outline: none; }"], [".a { outline: 0; }"],
   ['.a::after { content: "Spremljeno"; }'], [".a::after { content: attr(data-x); }"], [".a { --x: red; }"],
 ])("CSS module check rejects %s", (css) => expect(checkModuleCss(css)).not.toEqual([]));
 
