@@ -8,6 +8,8 @@ import ui from "./ui.module.css";
 
 const t = hr.obrazac;
 const POCETNI = { student: "0", teacher: "0", network_engineer: "0", institution_admin: "1" };
+/** @type {Record<string, string>} */
+const POCETNE_GRESKE = {};
 const REDOSLIJED = ["fakultetId", "aaiDomena", ...ULOGE.map(([u]) => `racuni.${u}`)];
 
 // Error code per field (src/lib/institucija.js and the BFF) -> text.
@@ -31,17 +33,18 @@ export default function DodajInstituciju({ fakulteti, institucije }) {
   const [aaiDomena, setAaiDomena] = useState("");
   const [predlozena, setPredlozena] = useState("");
   const [racuni, setRacuni] = useState(POCETNI);
-  const [greske, setGreske] = useState({});
+  const [greske, setGreske] = useState(POCETNE_GRESKE);
   const [opca, setOpca] = useState("");
   const [saljem, setSaljem] = useState(false);
-  const obrazacRef = useRef(null);
-  const gumbRef = useRef(null);
+  const obrazacRef = useRef(/** @type {HTMLFormElement | null} */ (null));
+  const gumbRef = useRef(/** @type {HTMLButtonElement | null} */ (null));
 
   const zauzeti = new Set(institucije.map((i) => i.fakultetId));
 
   function fokusirajPrvu(polja) {
     const prvo = REDOSLIJED.find((p) => polja[p]);
-    if (prvo) obrazacRef.current?.querySelector(`#${idPolja(prvo)}`)?.focus();
+    const polje = prvo && obrazacRef.current?.querySelector(`#${idPolja(prvo)}`);
+    if (polje instanceof HTMLElement) polje.focus();
   }
 
   function odaberiFakultet(id) {

@@ -35,6 +35,7 @@ export function predloziDomenu(web) {
 
 /** @returns {Record<string, string>} field -> error code; empty when the input may be sent. */
 export function provjeriUnos({ fakultetId, aaiDomena, racuni }) {
+  /** @type {Record<string, string>} */
   const greske = {};
   if (!fakultetId) greske.fakultetId = "obavezno";
   const d = normalizirajDomenu(aaiDomena);

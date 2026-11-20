@@ -2,19 +2,20 @@
 // Answers 201 {institucija} or {greska, polja} with an error code per field.
 import { greskaStvaranja, normalizirajDomenu, provjeriUnos, ULOGE } from "../../../src/lib/institucija.js";
 import { pozoviServer, procitajJson } from "../../../src/server/aplication-server.js";
-import { kolacicZahtjeva, nedozvoljeno, odgovor, procitajMutaciju } from "../../../src/server/bff.js";
+import { kaoZapis, kolacicZahtjeva, nedozvoljeno, odgovor, procitajMutaciju } from "../../../src/server/bff.js";
 
 export async function POST(request) {
   const m = await procitajMutaciju(request);
-  if (m.odbijeno) return m.odbijeno;
+  if ("odbijeno" in m) return m.odbijeno;
   const kolacic = kolacicZahtjeva(request);
   if (!kolacic) return odgovor({ greska: "nije_prijavljen", polja: {} }, 401);
 
-  const t = m.tijelo && typeof m.tijelo === "object" ? m.tijelo : {};
+  const t = m.tijelo;
+  const racuni = kaoZapis(t.racuni);
   const unos = {
     fakultetId: typeof t.fakultetId === "string" ? t.fakultetId : "",
     aaiDomena: typeof t.aaiDomena === "string" ? normalizirajDomenu(t.aaiDomena) : "",
-    racuni: Object.fromEntries(ULOGE.map(([u]) => [u, t.racuni?.[u]])),
+    racuni: Object.fromEntries(ULOGE.map(([u]) => [u, racuni[u]])),
   };
   const polja = provjeriUnos(unos);
   if (Object.keys(polja).length) return odgovor({ greska: "neispravan_unos", polja }, 400);
