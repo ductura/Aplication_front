@@ -12,7 +12,7 @@ export default function ObrazacPrijave() {
   const router = useRouter();
   const [greska, setGreska] = useState("");
   const [saljem, setSaljem] = useState(false);
-  const imeRef = useRef(null);
+  const imeRef = useRef(/** @type {HTMLInputElement | null} */ (null));
   // Until hydration the button stays disabled, so the browser can never send
   // the form natively (a GET would put the password into the URL).
   const spreman = useSyncExternalStore(bezPretplate, () => true, () => false);

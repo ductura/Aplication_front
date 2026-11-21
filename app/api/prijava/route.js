@@ -6,8 +6,8 @@ const tekst = (v) => typeof v === "string" && v.length >= 1 && v.length <= 256;
 
 export async function POST(request) {
   const m = await procitajMutaciju(request);
-  if (m.odbijeno) return m.odbijeno;
-  const { korisnickoIme, lozinka } = m.tijelo ?? {};
+  if ("odbijeno" in m) return m.odbijeno;
+  const { korisnickoIme, lozinka } = m.tijelo;
   if (!tekst(korisnickoIme) || !tekst(lozinka)) return odgovor({ greska: "neispravan_unos" }, 400);
 
   const res = await pozoviServer("/api/admin/prijava", { method: "POST", tijelo: { korisnickoIme, lozinka } });

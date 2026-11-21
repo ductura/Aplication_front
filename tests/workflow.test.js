@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { checkWorkflow } from "../scripts/checks/workflow.mjs";
 
 const sha = "3d3c42e5aac5ba805825da76410c181273ba90b1";
@@ -46,15 +47,17 @@ describe("workflow checker", () => {
     expect(checkWorkflow(ok.replace("    runs-on", `    container: node@sha256:${"b".repeat(64)}\n    runs-on`))).toEqual([]);
   });
 
-  it("every real workflow passes and CI runs install, lint, test and build", () => {
+  it("every workflow passes and CI checks the phase two branch", () => {
     const dir = ".github/workflows";
     const files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f));
     expect(files).toContain("ci.yml");
     for (const f of files) expect(checkWorkflow(readFileSync(`${dir}/${f}`, "utf8")), f).toEqual([]);
-    const ci = readFileSync(`${dir}/ci.yml`, "utf8");
-    for (const cmd of ["pnpm install --frozen-lockfile", "pnpm lint", "pnpm test", "pnpm build"]) {
-      expect(ci).toContain(`run: ${cmd}\n`);
-    }
-    expect(ci).toContain("persist-credentials: false");
+    const ci = parse(readFileSync(`${dir}/ci.yml`, "utf8"));
+    const steps = ci.jobs.ci.steps;
+    expect(steps.map((step) => step.run)).toEqual(expect.arrayContaining([
+      "pnpm install --frozen-lockfile", "pnpm typecheck", "pnpm lint", "pnpm test", "pnpm build", "pnpm e2e",
+    ]));
+    expect(ci.on.push.branches).toEqual(expect.arrayContaining([expect.stringMatching(/^migracija\/(?:faza2|\*\*)$/)]));
+    expect(steps.find((step) => step.uses?.startsWith("actions/checkout@"))?.with?.["persist-credentials"]).toBe(false);
   });
 });
