@@ -2,12 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import Nedostupno from "../../../src/components/Nedostupno.jsx";
 import Osvjezavanje from "../../../src/components/Osvjezavanje.jsx";
+import PonoviPokusaj from "../../../src/components/PonoviPokusaj.jsx";
+import PovijestPokusaja, { formatirajVrijeme } from "../../../src/components/PovijestPokusaja.jsx";
 import StanjeInstance from "../../../src/components/StanjeInstance.jsx";
 import Traka from "../../../src/components/Traka.jsx";
 import ui from "../../../src/components/ui.module.css";
 import { hr } from "../../../src/i18n/hr.js";
 import { U_TIJEKU, ULOGE } from "../../../src/lib/institucija.js";
-import { dohvatiInstitucije, dohvatiSesiju } from "../../../src/server/podaci.js";
+import { dohvatiInstituciju, dohvatiSesiju } from "../../../src/server/podaci.js";
 import styles from "../../page.module.css";
 
 const STANJE_GRESKA = "greska";
@@ -15,17 +17,17 @@ const STANJE_U_IZRADI = "u_izradi";
 export const dynamic = "force-dynamic";
 
 const t = hr.instanca;
-const vrijeme = (v) => (v ? new Date(v).toLocaleString("hr-HR", { timeZone: "Europe/Zagreb" }) : "—");
+const vrijeme = formatirajVrijeme;
 
 export default async function Institucija({ params }) {
   const { id } = await params;
   const sesija = await dohvatiSesiju();
   if (sesija.stanje === "odjavljen") redirect("/prijava");
   if (sesija.stanje === "nedostupan") return <Nedostupno />;
-  const institucije = await dohvatiInstitucije();
-  if (institucije === "odjavljen") redirect("/prijava");
-  if (institucije === "nedostupan") return <Nedostupno admin={sesija.admin} />;
-  const i = institucije.find((x) => x.id === id);
+  const dohvacena = await dohvatiInstituciju(id);
+  if (dohvacena === "odjavljen") redirect("/prijava");
+  if (dohvacena === "nedostupan") return <Nedostupno admin={sesija.admin} />;
+  const i = dohvacena === "nema" ? null : dohvacena;
   const p = i?.provisioning ?? {};
   const stanje = p.stanje;
   const pokusaja = Number.isSafeInteger(p.pokusaja) ? p.pokusaja : null;
@@ -59,8 +61,11 @@ export default async function Institucija({ params }) {
                 <>
                   <p className={ui.pomoc}>{t.osvjezava}</p>
                   <Osvjezavanje />
+                  <PonoviPokusaj id={i.id} />
                 </>
               )}
+              <h2>{hr.povijest.naslov}</h2>
+              <PovijestPokusaja pokusaji={i.pokusaji} />
               <h2>{t.podaci}</h2>
               <dl className={ui.podaci}>
                 <dt>{t.slug}</dt>
