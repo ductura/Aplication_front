@@ -7,6 +7,7 @@
 // Aplication_server records a final refusal of Institution_server.
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
+import { rukujDetaljem } from "./lazni-detalj.mjs";
 
 const PORT = Number(process.env.LAZNI_PORT ?? 3199);
 const ADMIN = { korisnickoIme: "admin-test", lozinka: "lozinka-samo-za-test" };
@@ -99,8 +100,10 @@ const server = createServer(async (req, res) => {
     sesije.delete(kolacic(req));
     return posalji(res, 204, undefined, { "set-cookie": "ductura_admin=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict" });
   }
+  if (url.pathname.startsWith("/__stanje/")) return rukujDetaljem(req, res, url, { institucije, prijavljen, posalji, citaj });
   if (!url.pathname.startsWith("/api/admin/")) return posalji(res, 404, { error: "nema" });
   if (!prijavljen) return posalji(res, 401, { error: "nije_prijavljen" });
+  if (rukujDetaljem(req, res, url, { institucije, prijavljen, posalji, citaj }) !== false) return;
   if (r === "GET /api/admin/ja") return posalji(res, 200, { korisnickoIme: ADMIN.korisnickoIme });
   if (r === "GET /api/admin/fakulteti") return posalji(res, 200, { fakulteti: FAKULTETI });
   if (r === "GET /api/admin/institutions") {
