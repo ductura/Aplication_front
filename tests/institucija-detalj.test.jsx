@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Institucija from "../app/institucije/[id]/page.jsx";
 import * as ponovi from "../app/api/institucije/[id]/ponovi/route.js";
+import * as ponoviV1 from "../app/api/v1/institucije/[id]/ponovi/route.js";
 import PonoviPokusaj, { posaljiPonovi } from "../src/components/PonoviPokusaj.jsx";
 import PovijestPokusaja from "../src/components/PovijestPokusaja.jsx";
 import { hr } from "../src/i18n/hr.js";
@@ -153,7 +154,7 @@ describe("posaljiPonovi maps BFF answers", () => {
     const f = sOdgovorom(200);
     await posaljiPonovi(ID, f);
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe(`/admin/api/institucije/${ID}/ponovi`);
+    expect(url).toBe(`/admin/api/v1/institucije/${ID}/ponovi`);
     expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
     expect(await posaljiPonovi(ID, async () => Promise.reject(new TypeError("x")))).toBe("nedostupan");
   });
@@ -226,5 +227,11 @@ describe("POST /admin/api/institucije/{id}/ponovi", () => {
     expect((await poziv(zahtjev())).status).toBe(502);
     expect(ponovi.GET().status).toBe(405);
     expect(ponovi.GET().headers.get("allow")).toBe("POST");
+  });
+});
+
+describe("POST /admin/api/v1/institucije/{id}/ponovi", () => {
+  it("is the same handler the browser button calls through api()", () => {
+    for (const m of ["POST", "GET", "PUT", "PATCH", "DELETE"]) expect(ponoviV1[m]).toBe(ponovi[m]);
   });
 });

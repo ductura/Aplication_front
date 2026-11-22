@@ -8,7 +8,7 @@ const ID = /^[A-Za-z0-9-]{1,64}$/;
 
 export async function POST(request, { params }) {
   const m = await procitajMutaciju(request);
-  if (m.odbijeno) return m.odbijeno;
+  if ("odbijeno" in m) return m.odbijeno;
   const kolacic = kolacicZahtjeva(request);
   if (!kolacic) return odgovor({ greska: "nije_prijavljen" }, 401);
   const { id } = await params;

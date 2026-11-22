@@ -34,7 +34,9 @@ export async function posaljiPonovi(id, dohvati = fetch) {
 export default function PonoviPokusaj({ id }) {
   const router = useRouter();
   const [saljem, postaviSaljem] = useState(false);
-  const [greska, postaviGresku] = useState(null);
+  const [greska, postaviGresku] = useState(
+    /** @type {"nema" | "nije_ponovljivo" | "nedostupan" | "opce" | null} */ (null),
+  );
 
   async function klik() {
     postaviSaljem(true);

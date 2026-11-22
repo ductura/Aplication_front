@@ -16,7 +16,7 @@ test.beforeEach(async ({ page, request }) => {
     // Chrome logs every 4xx answer of fetch(); only the 409 of an outdated retry is expected.
     const ocekivano =
       /^Failed to load resource: the server responded with a status of 409 /.test(m.text()) &&
-      /\/admin\/api\/institucije\/[^/]+\/ponovi$/.test(m.location().url);
+      /\/admin\/api\/v1\/institucije\/[^/]+\/ponovi$/.test(m.location().url);
     if (!ocekivano) greskeKonzole.push(m.text());
   });
   page.on("pageerror", (e) => greskeKonzole.push(String(e)));
@@ -33,7 +33,7 @@ async function bezNalaza(page) {
 
 // Logs in through the app and creates an institution straight on the fake server (no list read,
 // so the fake does not advance the state on its own). Returns its id.
-async function pripremi(page, request, { fakultetId = "fpzg", aaiDomena = "fpzg.hr", provisioning, pokusaji } = {}) {
+async function pripremi(page, request, { fakultetId = "demo-jantar", aaiDomena = "demo-jantar.example", provisioning, pokusaji } = {}) {
   await page.goto("/admin/prijava");
   await page.getByLabel(hr.prijava.korisnickoIme).fill(ADMIN.ime);
   await page.getByLabel(hr.prijava.lozinka).fill(ADMIN.lozinka);
@@ -79,8 +79,8 @@ test("the retry button is shown for a requested instance and not for an active o
   await expect(page.getByText(hr.povijest.prazno)).toBeVisible();
 
   for (const [fakultetId, aaiDomena, provisioning] of [
-    ["ffzg", "ffzg.hr", { stanje: "aktivna", aktivirano: "2026-11-18T22:05:00Z" }],
-    ["pmf", "pmf.hr", { stanje: "greska", kodGreske: "domena_zauzeta" }],
+    ["demo-sjever", "demo-sjever.example", { stanje: "aktivna", aktivirano: "2026-11-18T22:05:00Z" }],
+    ["demo-otok", "demo-otok.example", { stanje: "greska", kodGreske: "domena_zauzeta" }],
   ]) {
     const res = await request.post(`${LAZNI}/api/admin/institutions`, {
       headers: { cookie: `ductura_admin=${(await page.context().cookies()).find((c) => c.name === "ductura_admin").value}` },
@@ -105,7 +105,7 @@ test("an unknown institution shows that it was not found, without a button", asy
 });
 
 test("a server that is down shows the unavailable message instead of the page", async ({ page, request }) => {
-  const id = await pripremi(page, request, { fakultetId: "pmf", aaiDomena: "nedostupna.pmf.hr" });
+  const id = await pripremi(page, request, { fakultetId: "demo-otok", aaiDomena: "nedostupna.demo-otok.example" });
   await page.goto(`/admin/institucije/${id}`);
   await expect(page.getByText(hr.greske.nedostupan)).toBeVisible();
   // No axe here: the shared Nedostupno component (not part of this task) has a contrast finding.
