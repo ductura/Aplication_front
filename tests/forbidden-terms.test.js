@@ -40,6 +40,27 @@ describe("forbidden terms scanner (PRODUCT.md §5, D-276)", () => {
     expect(hit(text)).toEqual([]);
   });
 
+  it("reports a letter outside the allowed scripts even when its other case is inside them", () => {
+    expect(hit("suɲjivo")).not.toEqual([]);
+    expect(hit("ɲ")).not.toEqual([]);
+    expect(hit("Ž, č, ć, đ, š, ž, dž, Ü, ß")).toEqual([]);
+  });
+
+  // Separators and invisible characters inside a term are findings themselves, never folded into a word break.
+  const INSERTED = [
+    " ", " ", "⠀", "　", "", "\u{f0000}", "͸", "·", "‧", "•", "️",
+    "̲", "­", "​", "‍", "⁠", "͏", "ㅤ", "\u{e0041}", "\u{1d173}", "\t", "\n", "_", "~",
+  ];
+  it.each(INSERTED.map((c) => [`U+${c.codePointAt(0).toString(16).toUpperCase()}`, c]))("reports %s inside a word", (_, c) => {
+    expect(hit(`sumn${c}jivo`)).not.toEqual([]);
+    expect(hit(`Dodaj${c}instituciju`)).not.toEqual([]);
+  });
+
+  it("accepts every character the UI text set allows", () => {
+    expect(hit("Dodaj: (a) [b] - – — … / % + = & @ # * « » „x“ ”y” ‘z’ ← → ↑ ↓ 40 % ! ? ; , . ' \"")).toEqual([]);
+    expect(hit("Učitavanje".normalize("NFD"))).toEqual([]);
+  });
+
   it("walks arrays and reports values that are not text, plain objects or arrays", () => {
     const value = { l: ["ok", "rizik"], n: 1, f: null, fn: () => "x", m: new Map(), s: new String("x"), d: new Date() };
     expect(findForbidden(value).map((x) => x.key).sort()).toEqual(["d", "f", "fn", "l.1", "m", "n", "s"]);
