@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { posix } from "node:path";
+import { Linter } from "eslint";
 import { describe, expect, it } from "vitest";
 
 // UI text reaches the page only through files the checks read: scripts under the lint rule
@@ -51,6 +52,8 @@ const cssProblems = (raw) => {
   if (raw.includes("\\")) out.push("escape");
   const css = stripComments(raw);
   if (/url\(|data:/i.test(css)) out.push("url");
+  // attr() writes an attribute's text in content and in other properties alike, so it is not used at all.
+  if (/attr\s*\(/i.test(css)) out.push("attr()");
   // A string custom property (--ff-*) may be used only as a font; text-writing properties take no var().
   for (const m of css.matchAll(/(?<![-\w.#])([-\w]+)\s*:\s*([^;{}]*)(?=[;}]|$)/g)) {
     const prop = m[1].toLowerCase();
@@ -75,16 +78,36 @@ const cssProblems = (raw) => {
 // Scripts under app/ and src/ import only from app/ and src/ (files the checks read) or from these packages;
 // a JSON file, fs or a computed specifier would bring text past the lint rule.
 const PACKAGES = /^(react|react-dom|next)(\/[\w/-]+)?$/;
+// Specifiers are read from the syntax tree (ESLint's own parser), so a comment or line break between the
+// keyword and the string cannot hide one.
+const linter = new Linter();
+const specifiers = (text) => {
+  const found = [];
+  const add = (node) => found.push(node?.type === "Literal" && typeof node.value === "string" ? node.value : null);
+  const plugin = { rules: { s: { create: () => ({
+    ImportDeclaration: (n) => add(n.source),
+    ExportAllDeclaration: (n) => add(n.source),
+    ExportNamedDeclaration: (n) => n.source && add(n.source),
+    ImportExpression: (n) => add(n.source),
+    CallExpression: (n) => n.callee.type === "Identifier" && n.callee.name === "require" && add(n.arguments[0]),
+  }) } } };
+  const messages = linter.verify(text, [{
+    languageOptions: { ecmaVersion: "latest", sourceType: "module", parserOptions: { ecmaFeatures: { jsx: true } } },
+    plugins: { x: plugin }, rules: { "x/s": "error" },
+  }], { filename: "x.js" });
+  return messages.some((m) => m.fatal) ? [null] : found;
+};
 const importProblems = (file, text) => {
   const out = [];
-  if (/\b(import|require)\s*\(\s*(?!(["'])[^"'`$]*\2\s*\))/.test(text)) out.push("computed specifier");
+  const specs = specifiers(text);
+  if (specs.includes(null)) out.push("computed specifier or unparsed file");
   // Modules and code reached without an import: process.* other than process.env.NAME, globalThis, eval, Function
   // and .constructor (the way to Function without naming it). This reads words, not meaning: it stops slips, not
   // a deliberately disguised name; review covers that.
   if (/\bprocess\b(?!\.env\.\w)/.test(text)) out.push("process");
   if (/\b(globalThis|eval|Function|getBuiltinModule|constructor)\b/.test(text)) out.push("global access");
-  for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(["'`])([^"'`]*)\1/g)) {
-    const spec = m[2];
+  for (const spec of specs) {
+    if (spec === null) continue;
     if (!spec.startsWith(".")) {
       if (!PACKAGES.test(spec)) out.push(spec);
       continue;
@@ -136,6 +159,8 @@ describe("UI text sources", () => {
       ':root{--ff-q:"x "} .e{quotes:var(--ff-q) var(--ff-q)}', ".f::after{content:var(--c)}", ".g{counter-reset:var(--c)}",
       ".h{grid-area:var(--ff-q)}", ".x::before{@media all{}content:attr(t)}", ':root{--ff-q:"x"} .x::before{.y{}content:var(--ff-q)}',
       "li{@media all{}list-style-type:var(--ff-q)}", ".x::before{}content:attr(t)", '.x{.y{}quotes:"x" "y"}',
+      ".q{list-style-type:attr(data-q)}", "li{list-style:attr(data-q) inside}", "q{quotes:attr(data-a) attr(data-b)}",
+      ".x{text-emphasis-style:attr(data-q)}", ".x{text-emphasis-style:'x'}",
     ];
     for (const css of bad) expect(cssProblems(css), css).not.toEqual([]);
     const good = [
@@ -160,12 +185,16 @@ describe("UI text sources", () => {
       'const fs = process["getBuiltinModule"]("fs");', "const b = process.binding;", 'const f = globalThis.process;',
       'eval("x");', 'new Function("return 1")();', "const e = process.env;",
       'const g = [].constructor.constructor("return this")();', 'const g = x["constructor"];',
+      'import p from /* x */ "../../poruke.json";', 'import p from // x\n "../poruke.json";',
+      'export * as p from /* */ "../poruke.json";', 'import /**/ "../a.css";', 'const p = require(/**/ "../a.json");',
+      'const p = await import(/**/ "../a.json");', 'export { a } from /**/ "../a.js";', "import p from",
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
       'import { hr } from "../src/i18n/hr.js";', 'import s from "./page.module.css";', 'import Link from "next/link";',
       'import { useState } from "react";', 'const P = await import("../src/components/Traka.jsx");',
-      "const u = process.env.APLICATION_SERVER_URL;",
+      "const u = process.env.APLICATION_SERVER_URL;", 'import { hr } from /* catalogue */ "../src/i18n/hr.js";',
+      'const s = "from \\"../a.json\\""; const t = <p className="x">{s}</p>;',
     ];
     for (const s of good) expect(importProblems("app/page.jsx", s), s).toEqual([]);
 
