@@ -11,8 +11,10 @@ const BINARY = /\.(png|ico|jpe?g|webp|avif|gif|woff2?)$/;
 const list = (dir) => (existsSync(dir) ? readdirSync(dir, { recursive: true, withFileTypes: true }) : [])
   .map((e) => ({ path: `${e.parentPath}/${e.name}`.replaceAll("\\", "/"), file: e.isFile(), dir: e.isDirectory() }));
 const rejected = (entries, ok) => entries.filter((e) => !e.dir && !(e.file && ok.test(e.path))).map((e) => e.path);
+// Comments are removed first: one between a property and its colon would hide the declaration,
+// and a declaration written inside a comment is not one.
 const declarations = (css, prop) =>
-  [...css.matchAll(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`, "gi"))].map((m) => m[1].trim());
+  [...css.replace(/\/\*[\s\S]*?(\*\/|$)/g, " ").matchAll(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`, "gi"))].map((m) => m[1].trim());
 
 describe("UI text sources", () => {
   it("app/ and src/ hold only scripts the lint rule reads and CSS; public/ holds only binary assets", () => {
@@ -42,10 +44,15 @@ describe("UI text sources", () => {
   it("no CSS file under app/ or src/ writes text through content", () => {
     expect(declarations('.a::after{content:"x"} .b{ content : attr(data-x) ;}', "content")).toEqual(['"x"', "attr(data-x)"]);
     expect(declarations(".a{--content: 1; background-content: 2}", "content")).toEqual([]);
+    expect(declarations('.a::after{content/**/: "x"} .b{content/* a\n b */:"y"}', "content")).toEqual(['"x"', '"y"']);
+    expect(declarations('/* content: "x" */ .a{color:red} /* .b{content:"y"}', "content")).toEqual([]);
     const css = [...list("app"), ...list("src")].filter((e) => e.file && e.path.endsWith(".css")).map((e) => e.path);
     expect(css).toContain("app/globals.css");
     for (const f of css) {
-      for (const v of declarations(readFileSync(f, "utf8"), "content")) expect(v, f).toMatch(/^(""|''|none)$/);
+      const text = readFileSync(f, "utf8");
+      // A CSS escape can spell a property name (\63ontent), so escapes are not allowed at all.
+      expect(text.includes("\\"), f).toBe(false);
+      for (const v of declarations(text, "content")) expect(v, f).toMatch(/^(""|''|none)$/);
     }
   });
 });
