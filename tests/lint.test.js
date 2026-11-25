@@ -23,7 +23,8 @@ describe("UI text must come from the catalogue (real eslint.config.mjs)", () => 
     ['<Field label={<p>{x ? "Da" : "Ne"}</p>} />', TEXT], ['<Field render={() => <p>{"Da".trim()}</p>} />', TEXT],
   ])("fails on %s", async (jsx, rule) => {
     expect(await ruleIds(component(jsx))).toContain(rule);
-  });
+    // The first case loads the real eslint.config.mjs cold (17-31 s on a Windows machine).
+  }, 60_000);
 
   it("fails on literal text in a .mjs component and ignores eslint-disable comments", async () => {
     expect(await ruleIds(component("<p>Sumnjivo</p>"), "app/bad.mjs")).toContain("react/jsx-no-literals");
