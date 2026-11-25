@@ -73,6 +73,14 @@ describe("text with letters in app/ and src/ outside src/i18n is a technical tok
   it("reads technical places too: hidden characters fail", async () => {
     expect(await ui('export const A = () => <p className={"a\\u200bb"} />;\n')).toContain("text");
     expect(await ui('export const a = "a" + "\\u00ad" + "b";\n')).toContain("text");
+    for (const c of ["\\u0000", "\\b", "\\u001b", "\\u007f", "\\u0085"]) expect(await ui(`export const a = "${c}";\n`)).toContain("text");
+  });
+
+  it("reads static parts of templates and + chains as written together", async () => {
+    expect(await ui('export const a = `sum${"n"}jivo`;\n')).toContain("text");
+    expect(await ui('export const a = (x) => "sum" + "njivo" + x;\n')).toContain("text");
+    expect(await ui('export const a = (x) => x + "sum" + "njivo";\n')).toContain("text");
+    expect(await ui('export const a = (x) => `${x}dodaj${" "}instituciju`;\n')).toContain("literal");
   });
 
   it("technical tokens, technical attributes and src/i18n pass", async () => {

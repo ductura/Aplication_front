@@ -10,7 +10,7 @@
 //    not applied); any other attribute, including props of our own components, fails even in lower case.
 // 3. Every literal, technical or not, is also read whole: static concatenation and joins of literal arrays
 //    included. It fails on a term from forbidden-terms.mjs or a character that hides or disguises text
-//    (format, private-use, unassigned, combining marks after NFC, separators other than space and
+//    (controls other than tab and line breaks, format, private-use, unassigned, combining marks after NFC, separators other than space and
 //    no-break spaces, fillers, letters outside Latin-1 and Latin Extended-A/B).
 //
 // What stays open: a single lower-case ASCII word (or a template piece between expressions) outside a JSX
@@ -22,7 +22,7 @@ const TECHNICAL = new Set(["GET", "POST", "Cache-Control", "Europe/Zagreb", "=; 
 const TECH_ATTRS =
   /^(className|key|href|lang|type|id|htmlFor|name|method|rel|target|role|scope|autoComplete|inputMode|src|dir|data-[\w-]+|aria-(hidden|live|current|invalid|describedby|labelledby|controls|expanded|busy|atomic|haspopup|pressed|selected|required|disabled|modal))$/;
 
-const HIDDEN = /[\p{Cf}\p{Co}\p{Cn}\p{M}⠀ㅤﾠᅟᅠ]|[^\P{Z}   ]|(?![a-zA-ZÀ-ɏ])\p{L}/u;
+const HIDDEN = /(?![\t\n\r])\p{Cc}|[\p{Cf}\p{Co}\p{Cn}\p{M}⠀ㅤﾠᅟᅠ]|[^\P{Z}   ]|(?![a-zA-ZÀ-ɏ])\p{L}/u;
 const isTechnical = (t) => {
   if (!/\p{L}/u.test(t) || TECHNICAL.has(t)) return true;
   return /^[\x21-\x7e]+$/.test(t) && /^[^A-Za-z]*[a-z]/.test(t);
@@ -32,13 +32,36 @@ const isTechnical = (t) => {
 const staticText = (node) => {
   if (!node) return undefined;
   if (node.type === "Literal" && typeof node.value === "string") return node.value;
-  if (node.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0].value.cooked ?? undefined;
-  if (node.type === "BinaryExpression" && node.operator === "+") {
-    const l = staticText(node.left);
-    const r = staticText(node.right);
-    return l === undefined || r === undefined ? undefined : l + r;
+  if (node.type === "TemplateLiteral" || (node.type === "BinaryExpression" && node.operator === "+")) {
+    const parts = segments(node);
+    return parts.length === 1 && parts[0] !== undefined ? parts[0] : undefined;
   }
   return undefined;
+};
+
+// The parts of a template or a + chain in order: static text, or undefined for a dynamic operand.
+const operands = (node) => {
+  if (node.type === "BinaryExpression" && node.operator === "+") return [...operands(node.left), ...operands(node.right)];
+  if (node.type === "TemplateLiteral") {
+    return node.quasis.flatMap((q, i) =>
+      i < node.expressions.length ? [q.value.cooked ?? q.value.raw, staticText(node.expressions[i])] : [q.value.cooked ?? q.value.raw]);
+  }
+  return [staticText(node)];
+};
+// Static runs between dynamic operands, each joined: `sum${"n"}jivo` is one run, `a${x}b` two.
+// A chain with no static text at all gives [undefined].
+const segments = (node) => {
+  const out = [];
+  let run;
+  for (const p of operands(node)) {
+    if (p === undefined) {
+      if (run !== undefined) out.push(run);
+      run = undefined;
+      if (out.length === 0 || out.at(-1) !== undefined) out.push(undefined);
+    } else run = (run ?? "") + p;
+  }
+  if (run !== undefined) out.push(run);
+  return out;
 };
 
 // The JSX attribute a literal belongs to, looking up through expressions only (not into a nested element,
@@ -81,6 +104,15 @@ const literalText = {
       }
       if (!pieces.every(isTechnical)) context.report({ node, messageId: "literal" });
     };
+    // A template or an outermost + chain: each static run, and all runs joined (an empty dynamic operand
+    // between them can split a term).
+    const whole = (node) => {
+      const runs = segments(node).filter((t) => t !== undefined);
+      if (runs.length === 0) return;
+      for (const t of runs) read(node, t);
+      read(node, runs.join(""));
+      shape(node, runs);
+    };
     return {
       Literal(node) {
         if (typeof node.value !== "string") return;
@@ -91,19 +123,10 @@ const literalText = {
         read(node, node.value);
         if (/\p{L}/u.test(node.value)) context.report({ node, messageId: "literal" });
       },
-      TemplateLiteral(node) {
-        const pieces = node.quasis.map((q) => q.value.cooked ?? q.value.raw);
-        // Each piece, and the pieces joined: an empty or literal expression between them can split a term.
-        for (const t of pieces) read(node, t);
-        read(node, pieces.join(""));
-        shape(node, pieces);
-      },
+      TemplateLiteral: (node) => whole(node),
       BinaryExpression(node) {
-        if (node.parent?.type === "BinaryExpression" && node.parent.operator === "+") return;
-        const text = staticText(node);
-        if (text === undefined || node.operator !== "+") return;
-        read(node, text);
-        shape(node, [text]);
+        if (node.operator !== "+" || (node.parent?.type === "BinaryExpression" && node.parent.operator === "+")) return;
+        whole(node);
       },
       "CallExpression[callee.property.name='join']"(node) {
         const arr = node.callee.object;
