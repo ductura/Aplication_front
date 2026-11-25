@@ -159,11 +159,12 @@ describe("bounded request body (16 KB)", () => {
   const zaglavlja = { "content-type": "application/json", "sec-fetch-site": "same-origin" };
   const tok = (body, dodatno = {}) =>
     new Request("http://127.0.0.1:3120/admin/api/v1/prijava", { method: "POST", headers: { ...zaglavlja, ...dodatno }, body, duplex: "half" });
-  /** An endless stream of 4 KB chunks that records how far it was read and whether it was cancelled. */
+  /** A 1 MB stream of 4 KB chunks (far past the limit, but finite so an unbounded reader fails the assertions instead of exhausting memory) that records how far it was read and whether it was cancelled. */
   const beskonacno = () => {
     const stanje = { procitano: 0, otkazano: false };
     const stream = new ReadableStream({
       pull(c) {
+        if (stanje.procitano >= 1024 * 1024) return c.close();
         stanje.procitano += 4096;
         c.enqueue(new Uint8Array(4096).fill(0x20));
       },
@@ -188,7 +189,7 @@ describe("bounded request body (16 KB)", () => {
     }
   });
 
-  it("without Content-Length stops reading an endless body just past the limit", async () => {
+  it("without Content-Length stops reading a large body just past the limit", async () => {
     const { stream, stanje } = beskonacno();
     expect(await status(await procitajMutaciju(tok(stream)))).toEqual([413, { greska: "prevelik_zahtjev" }]);
     expect(stanje.otkazano).toBe(true);
