@@ -71,3 +71,10 @@ export function findForbidden(value, key = "") {
   }
   return [{ key, term: "not text" }];
 }
+
+// The term check alone, for string literals in code (scripts/checks/ui-text-lint.mjs).
+export const hasForbiddenTerm = (text) => {
+  let folded = fold(text);
+  for (const re of allowRes) folded = folded.replace(re, (m) => " ".repeat(m.length));
+  return termRes.some((re) => ((re.lastIndex = 0), re.test(folded)));
+};
