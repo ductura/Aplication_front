@@ -1,4 +1,5 @@
 import next from "eslint-config-next";
+import { uiTextPlugin } from "./scripts/checks/ui-text-lint.mjs";
 
 // UI text comes only from src/i18n (scanned by tests/forbidden-terms.test.js, PRODUCT.md §5).
 const TEXT_PROPS =
@@ -26,6 +27,14 @@ const config = [
         },
       ],
     },
+  },
+  {
+    // Text that reaches the page without passing the rules above is still checked like the catalogue.
+    files: ["app/**/*.{js,jsx,mjs}", "src/**/*.{js,jsx,mjs}"],
+    // Only the catalogue that tests/forbidden-terms.test.js scans is exempt.
+    ignores: ["src/i18n/hr.js"],
+    plugins: { "ui-text": uiTextPlugin },
+    rules: { "ui-text/literal-text": "error" },
   },
 ];
 
