@@ -40,3 +40,17 @@ export async function dohvatiFakultete() {
   if (typeof r === "string" || !Array.isArray(r.fakulteti)) return null;
   return r.fakulteti.filter((f) => f && typeof f.id === "string" && typeof f.naziv === "string");
 }
+
+/**
+ * One institution with its attempt history (GET /api/admin/institutions/{id}).
+ * @returns {Promise<"odjavljen" | "nedostupan" | "nema" | object>}
+ */
+export async function dohvatiInstituciju(id) {
+  const res = await pozoviServer(`/api/admin/institutions/${encodeURIComponent(id)}`, { kolacic: await kolacic() });
+  if (!res) return "nedostupan";
+  if (res.status === 401) return "odjavljen";
+  if (res.status === 404) return "nema";
+  if (!res.ok) return "nedostupan";
+  const institucija = (await procitajJson(res))?.institucija;
+  return institucija && typeof institucija === "object" && typeof institucija.id === "string" ? institucija : "nedostupan";
+}

@@ -1,5 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { checkWorkflow } from "../scripts/checks/workflow.mjs";
 
 const sha = "3d3c42e5aac5ba805825da76410c181273ba90b1";
@@ -30,7 +32,7 @@ describe("workflow checker", () => {
     ["pull_request_target", ok.replace("pull_request]", "pull_request_target]")],
     ["workflow_run", ok.replace("pull_request]", "workflow_run]")],
     ["secrets dot", env("secrets.TOKEN")], ["secrets index", env("secrets['TOKEN']")],
-    ["secrets upper case", env("SECRETS.TOKEN")], ["github token", env("github.token")],
+    ["secrets upper case", env("SECRETS.TOKEN")], ["github token", env("github.token")], ["github token index", env("github['token']")],
     ["local action", step("./.github/actions/x")], ["non-string uses", step("{ a: 1 }")],
     ["service image tag", `${ok}    services:\n      db:\n        image: postgres:latest\n`],
     ["container tag", ok.replace("    runs-on", "    container: node:26\n    runs-on")],
@@ -46,15 +48,29 @@ describe("workflow checker", () => {
     expect(checkWorkflow(ok.replace("    runs-on", `    container: node@sha256:${"b".repeat(64)}\n    runs-on`))).toEqual([]);
   });
 
-  it("every real workflow passes and CI runs install, lint, test and build", () => {
+  it("every workflow passes and CI checks the phase two branch", () => {
     const dir = ".github/workflows";
     const files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f));
     expect(files).toContain("ci.yml");
     for (const f of files) expect(checkWorkflow(readFileSync(`${dir}/${f}`, "utf8")), f).toEqual([]);
-    const ci = readFileSync(`${dir}/ci.yml`, "utf8");
-    for (const cmd of ["pnpm install --frozen-lockfile", "pnpm lint", "pnpm test", "pnpm build"]) {
-      expect(ci).toContain(`run: ${cmd}\n`);
-    }
-    expect(ci).toContain("persist-credentials: false");
+    const ci = parse(readFileSync(`${dir}/ci.yml`, "utf8"));
+    const steps = ci.jobs.ci.steps;
+    expect(steps.map((step) => step.run)).toEqual(expect.arrayContaining([
+      "pnpm install --frozen-lockfile", "pnpm typecheck", "pnpm lint", "pnpm test", "pnpm build", "pnpm e2e",
+    ]));
+    expect(ci.on.push.branches).toEqual(expect.arrayContaining([expect.stringMatching(/^migracija\/(?:faza2|\*\*)$/)]));
+    expect(steps.find((step) => step.uses?.startsWith("actions/checkout@"))?.with?.["persist-credentials"]).toBe(false);
+  });
+
+  it("ci-ok needs every other job, always runs and passes only when all of them succeeded", () => {
+    const ci = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
+    const ok = ci.jobs["ci-ok"];
+    expect(ok.if).toBe("always()");
+    expect([ok.needs].flat().sort()).toEqual(Object.keys(ci.jobs).filter((j) => j !== "ci-ok").sort());
+    expect(ok.steps).toHaveLength(1);
+    expect(ok.steps[0].env.REZULTATI).toBe("${{ join(needs.*.result, ' ') }}");
+    const run = (rezultati) => spawnSync("bash", ["-eo", "pipefail", "-c", ok.steps[0].run], { env: { REZULTATI: rezultati } }).status;
+    expect(run("success")).toBe(0);
+    for (const r of ["failure", "cancelled", "skipped", "success failure", ""]) expect(run(r), r).not.toBe(0);
   });
 });

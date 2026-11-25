@@ -5,7 +5,7 @@ import { kolacicZahtjeva, nedozvoljeno, odgovor, procitajMutaciju } from "../../
 
 export async function POST(request) {
   const m = await procitajMutaciju(request);
-  if (m.odbijeno) return m.odbijeno;
+  if ("odbijeno" in m) return m.odbijeno;
   const kolacic = kolacicZahtjeva(request);
   const res = kolacic ? await pozoviServer("/api/admin/odjava", { method: "POST", kolacic }) : null;
   const sa = res ? kolaciciZaPreglednik(res) : [];

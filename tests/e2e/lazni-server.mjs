@@ -7,14 +7,15 @@
 // Aplication_server records a final refusal of Institution_server.
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
+import { rukujDetaljem } from "./lazni-detalj.mjs";
 
 const PORT = Number(process.env.LAZNI_PORT ?? 3199);
 const ADMIN = { korisnickoIme: "admin-test", lozinka: "lozinka-samo-za-test" };
 const ZAKLJUCAN = "zakljucan-test"; // always 429
 const FAKULTETI = [
-  { id: "fpzg", naziv: "Fakultet političkih znanosti", web: "http://www.fpzg.hr" },
-  { id: "ffzg", naziv: "Filozofski fakultet", web: "http://www.ffzg.hr" },
-  { id: "pmf", naziv: "Prirodoslovno-matematički fakultet", web: "http://www.pmf.hr" },
+  { id: "demo-jantar", naziv: "Fakultet Jantar", web: "http://www.demo-jantar.example" },
+  { id: "demo-sjever", naziv: "Fakultet Sjever", web: "http://www.demo-sjever.example" },
+  { id: "demo-otok", naziv: "Fakultet Otok", web: "http://www.demo-otok.example" },
 ];
 const ULOGE = { student: [0, 50_000], teacher: [0, 5_000], institution_admin: [1, 20], network_engineer: [0, 20] };
 const HOME_ORG = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
@@ -99,8 +100,10 @@ const server = createServer(async (req, res) => {
     sesije.delete(kolacic(req));
     return posalji(res, 204, undefined, { "set-cookie": "ductura_admin=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict" });
   }
+  if (url.pathname.startsWith("/__stanje/")) return rukujDetaljem(req, res, url, { institucije, prijavljen, posalji, citaj });
   if (!url.pathname.startsWith("/api/admin/")) return posalji(res, 404, { error: "nema" });
   if (!prijavljen) return posalji(res, 401, { error: "nije_prijavljen" });
+  if (rukujDetaljem(req, res, url, { institucije, prijavljen, posalji, citaj }) !== false) return;
   if (r === "GET /api/admin/ja") return posalji(res, 200, { korisnickoIme: ADMIN.korisnickoIme });
   if (r === "GET /api/admin/fakulteti") return posalji(res, 200, { fakulteti: FAKULTETI });
   if (r === "GET /api/admin/institutions") {

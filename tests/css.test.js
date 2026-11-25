@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { expect, it } from "vitest";
+import { checkModuleCss } from "../scripts/checks/css.mjs";
 
 // Ductus DESIGN-SYSTEM.md §3 (commit 078c780f), D-188: dark graphite shell and near-white sheet.
 const shell = {
@@ -29,10 +30,23 @@ it("globals.css carries exactly the D-188 values per scope", () => {
   expect(css.match(/^\s*--[\w-]+:/gm)).toHaveLength(Object.keys(shell).length + Object.keys(whiteSheet).length);
 });
 
-it("CSS modules take colours only from tokens and never write the focus ring themselves", () => {
-  for (const f of ["app/page.module.css", "src/components/ui.module.css"]) {
-    const css = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-    expect(css.match(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/gi), f).toBeNull();
-    expect(css, f).not.toMatch(/outline/);
-  }
+it.each([
+  [".a { color: #abc; }"], [".a { color: #00000080; }"], [".a { background: rgb(0 0 0); }"], [".a { color: navy; }"],
+  [".a { color: hsla(0, 0%, 0%, 1); }"], [".a { color: oklch(0.5 0 0); }"], [".a { color: CanvasText; }"],
+  [".a { color: color-mix(in srgb, var(--ink), var(--accent)); }"], [".a { border: 1px solid red; }"],
+  [".a { border-radius : 8px; }"], [".a { border-top-left-radius: 8px; }"], [".a { border-radius: 999px 2px; }"],
+  [".a { border-radius: var(--x, 12px); }"], [".a { outline: 2px solid var(--accent); }"], [".a { outline-offset: 2px; }"],
+  [".a { outline: 0.2rem solid var(--accent); }"], [".a { outline-width: thick; }"], [".a:focus-visible { outline: none; }"], [".a { outline: 0; }"],
+  ['.a::after { content: "Spremljeno"; }'], [".a::after { content: attr(data-x); }"], [".a { --x: red; }"],
+])("CSS module check rejects %s", (css) => expect(checkModuleCss(css)).not.toEqual([]));
+
+it("CSS module check accepts tokens and ignores selectors; every real module is token-only", () => {
+  expect(checkModuleCss(".outline:hover { border: 1px solid var(--rule); border-radius: var(--radius); }")).toEqual([]);
+  expect(checkModuleCss(".a { background-size: cover; border-collapse: collapse; text-decoration: underline; content: ''; }")).toEqual([]);
+  const plain = ["app", "src"].flatMap((d) => readdirSync(d, { recursive: true }).map((f) => `${d}/${f}`));
+  expect(plain.filter((f) => f.endsWith(".css") && !f.endsWith(".module.css"))).toEqual(["app/globals.css"]);
+  const mods = ["app", "src"].flatMap((d) =>
+    readdirSync(d, { recursive: true }).filter((f) => f.endsWith(".module.css")).map((f) => `${d}/${f}`));
+  expect(mods).not.toEqual([]);
+  for (const f of mods) expect(checkModuleCss(readFileSync(f, "utf8")), f).toEqual([]);
 });

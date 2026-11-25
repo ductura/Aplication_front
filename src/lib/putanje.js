@@ -2,4 +2,4 @@
 // Next adds the base path to <Link>, router and redirect(); fetch() does not,
 // so BFF calls from the browser go through api().
 export const BASE_PATH = "/admin";
-export const api = (putanja) => `${BASE_PATH}/api${putanja}`;
+export const api = (putanja) => `${BASE_PATH}/api/v1${putanja}`;

@@ -96,11 +96,30 @@ export const hr = {
     racuni: "Računi po ulozi",
     nema: "Institucija nije pronađena.",
   },
+  povijest: {
+    naslov: "Povijest pokušaja",
+    prazno: "Još nema zabilježenih pokušaja podizanja instance.",
+    opisTablice: "Pokušaji podizanja instance, od najnovijeg",
+    stupci: { vrijeme: "Vrijeme", ishod: "Ishod", kod: "Kod greške" },
+    ishodi: { uspjeh: "Uspjelo", neuspjeh: "Nije uspjelo" },
+  },
+  ponovi: {
+    gumb: "Pokušaj ponovno",
+    saljem: "Šaljem…",
+    pomoc: "Ponovno pokreće podizanje instance na poslužitelju institucije.",
+    greske: {
+      nema: "Institucija nije pronađena.",
+      nije_ponovljivo: "Stanje instance se u međuvremenu promijenilo, pa novi pokušaj nije potreban.",
+      nedostupan: "Poslužitelj aplikacije trenutačno nije dostupan. Pokušajte ponovno za nekoliko trenutaka.",
+      opce: "Nešto nije uspjelo. Pokušajte ponovno.",
+    },
+  },
   greske: {
     nedostupan: "Poslužitelj aplikacije trenutačno nije dostupan. Pokušajte ponovno za nekoliko trenutaka.",
     opce: "Nešto nije uspjelo. Pokušajte ponovno.",
     pokusajPonovno: "Pokušaj ponovno",
   },
   notFound: { naslov: "Stranica nije pronađena.", natrag: "Natrag na administraciju" },
+  error: { heading: "Stranicu trenutačno nije moguće prikazati", retry: "Pokušaj ponovno" },
 };
 

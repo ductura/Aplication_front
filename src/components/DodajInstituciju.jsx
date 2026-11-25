@@ -8,7 +8,10 @@ import ui from "./ui.module.css";
 
 const t = hr.obrazac;
 const POCETNI = { student: "0", teacher: "0", network_engineer: "0", institution_admin: "1" };
-const REDOSLIJED = ["fakultetId", "aaiDomena", ...ULOGE.map(([u]) => `racuni.${u}`)];
+const POLJE_FAKULTET = "fakultetId";
+const POLJE_DOMENA = "aaiDomena";
+const poljeRacuna = (uloga) => `racuni.${uloga}`;
+const REDOSLIJED = [POLJE_FAKULTET, POLJE_DOMENA, ...ULOGE.map(([u]) => poljeRacuna(u))];
 
 // Error code per field (src/lib/institucija.js and the BFF) -> text.
 function tekstGreske(polje, kod) {
@@ -18,7 +21,7 @@ function tekstGreske(polje, kod) {
   if (polje === "aaiDomena") {
     return { obavezno: t.greske.domenaObavezna, zauzeto: t.greske.domenaZauzeta }[kod] ?? t.greske.domenaNeispravna;
   }
-  const [, min, max] = ULOGE.find(([u]) => `racuni.${u}` === polje) ?? [];
+  const [, min, max] = ULOGE.find(([u]) => poljeRacuna(u) === polje) ?? [];
   return t.greske.broj(min, max);
 }
 
@@ -31,17 +34,18 @@ export default function DodajInstituciju({ fakulteti, institucije }) {
   const [aaiDomena, setAaiDomena] = useState("");
   const [predlozena, setPredlozena] = useState("");
   const [racuni, setRacuni] = useState(POCETNI);
-  const [greske, setGreske] = useState({});
+  const [greske, setGreske] = useState(/** @type {Record<string, string>} */ ({}));
   const [opca, setOpca] = useState("");
   const [saljem, setSaljem] = useState(false);
-  const obrazacRef = useRef(null);
-  const gumbRef = useRef(null);
+  const obrazacRef = useRef(/** @type {HTMLFormElement | null} */ (null));
+  const gumbRef = useRef(/** @type {HTMLButtonElement | null} */ (null));
 
   const zauzeti = new Set(institucije.map((i) => i.fakultetId));
 
   function fokusirajPrvu(polja) {
     const prvo = REDOSLIJED.find((p) => polja[p]);
-    if (prvo) obrazacRef.current?.querySelector(`#${idPolja(prvo)}`)?.focus();
+    const polje = prvo && obrazacRef.current?.querySelector(`#${idPolja(prvo)}`);
+    if (polje instanceof HTMLElement) polje.focus();
   }
 
   function odaberiFakultet(id) {
@@ -158,7 +162,7 @@ export default function DodajInstituciju({ fakulteti, institucije }) {
                 </option>
               ))}
             </select>
-            {greskaZa("fakultetId")}
+            {greskaZa(POLJE_FAKULTET)}
           </div>
 
           <div className={ui.polje}>
@@ -178,14 +182,14 @@ export default function DodajInstituciju({ fakulteti, institucije }) {
             <p id="aaiDomena-pomoc" className={ui.pomoc}>
               {t.domenaPomoc}
             </p>
-            {greskaZa("aaiDomena")}
+            {greskaZa(POLJE_DOMENA)}
           </div>
 
           <fieldset className={ui.skupina}>
             <legend>{t.racuni}</legend>
             <div className={ui.mreza}>
               {ULOGE.map(([uloga, min, max]) => {
-                const polje = `racuni.${uloga}`;
+                const polje = poljeRacuna(uloga);
                 return (
                   <div className={ui.polje} key={uloga}>
                     <label htmlFor={idPolja(polje)}>{t.uloge[uloga]}</label>

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "migracija/**"]
   pull_request:
 
 permissions:
@@ -24,9 +24,25 @@ jobs:
       - name: Install pnpm (Node 26 has no corepack)
         run: npm install --global pnpm@12.21.0 && test "$(pnpm --version)" = "12.21.0"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
       - name: Install Chromium for e2e
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+
+  # Aggregate check: green only when every job it needs succeeded (branch protection is not changed here).
+  ci-ok:
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All required jobs succeeded
+        env:
+          REZULTATI: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needs: $REZULTATI"
+          for r in $REZULTATI; do test "$r" = "success" || exit 1; done
+          test -n "$REZULTATI"

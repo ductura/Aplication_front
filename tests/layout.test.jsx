@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import RootLayout, { metadata } from "../app/layout.jsx";
+import GlobalError from "../app/global-error.jsx";
+import NotFound from "../app/not-found.jsx";
 import Page from "../app/page.jsx";
 import Institucija from "../app/institucije/[id]/page.jsx";
 import Prijava from "../app/prijava/page.jsx";
@@ -32,11 +34,13 @@ beforeEach(() => {
   odgovori = {
     "/api/admin/ja": [200, { korisnickoIme: "admin-test" }],
     "/api/admin/institutions": [200, { institucije: [INST] }],
+    [`/api/admin/institutions/${INST.id}`]: [200, { institucija: INST }],
     "/api/admin/fakulteti": [200, { fakulteti: [{ id: "fpzg", naziv: INST.naziv, web: null }] }],
   };
   vi.stubGlobal("fetch", async (url, init) => {
     expect(init.headers.cookie).toBe("ductura_admin=sesija-test");
-    const [status, body] = odgovori[new URL(url).pathname];
+    const putanja = new URL(url).pathname;
+    const [status, body] = odgovori[putanja] ?? (putanja.startsWith("/api/admin/institutions/") ? [404, { error: "nema" }] : []);
     return Response.json(body, { status });
   });
 });
@@ -92,7 +96,7 @@ it("detail page shows the instance state and the accounts", async () => {
 
 it("detail page shows a refused instance with its reason and a failed attempt in progress", async () => {
   const sa = (provisioning) => {
-    odgovori["/api/admin/institutions"] = [200, { institucije: [{ ...INST, provisioning: { ...INST.provisioning, ...provisioning } }] }];
+    odgovori[`/api/admin/institutions/${INST.id}`] = [200, { institucija: { ...INST, provisioning: { ...INST.provisioning, ...provisioning } } }];
     return Institucija({ params: Promise.resolve({ id: INST.id }) }).then(renderToStaticMarkup);
   };
   const odbijena = await sa({ stanje: "greska", kodGreske: "slug_zauzet", zadnjaGreska: "409", pokusaja: 1 });
@@ -118,4 +122,18 @@ it("an unreachable server shows a message instead of data", async () => {
 it("repository has no TypeScript", () => {
   const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" });
   expect(files.split("\n").filter((f) => /\.(ts|tsx|mts|cts)$|(^|\/)tsconfig[^/]*\.json$/.test(f))).toEqual([]);
+});
+
+it("404 page uses catalogue text and links home", () => {
+  const html = renderToStaticMarkup(<NotFound />);
+  expect(html).toContain(hr.notFound.naslov);
+  expect(html).toMatch(new RegExp(`<a [^>]*href="/"[^>]*>${hr.notFound.natrag}</a>`));
+});
+
+it("global error page is Croatian, from the catalogue and hides error details", () => {
+  const html = renderToStaticMarkup(<GlobalError error={new Error("tajni detalj")} retry={() => {}} />);
+  expect(html).toMatch(/^<html lang="hr"/);
+  expect(html).toContain(hr.error.heading);
+  expect(html).toContain(hr.error.retry);
+  expect(html).not.toContain("tajni detalj");
 });
