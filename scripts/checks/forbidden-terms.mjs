@@ -1,7 +1,8 @@
 // Forbidden UI terms from Ductus docs/PRODUCT.md §5 (Rječnik) and D-276, Ductus commit 078c780f.
 // Text and patterns are folded: lower case, no diacritics, đ/dj -> d, format characters removed,
 // punctuation and symbols (except % and ') -> " ". W = rest of the word; "~" = any prefix.
-// Letters outside Latin-1 and Latin Extended-A/B are reported (homoglyphs).
+// Letters outside Latin-1 and Latin Extended-A/B are reported (homoglyphs), and so is any character
+// outside the UI text set below (invisible separators, private-use, unassigned): reported, never folded away.
 // Conditional rows are applied strictly (contract c.6992282372).
 const W = "\\p{L}*";
 const DATA = `poda[tc]${W}`;
@@ -45,8 +46,14 @@ const bounded = (src) =>
 const termRes = TERMS.map(bounded);
 const allowRes = ALLOWED.map(bounded);
 
+// Letters, ASCII digits, space, no-break spaces and the punctuation UI text uses. Extend only with visible characters.
+const UI_CHARS = /[^\p{L}0-9 \u00a0\u202f.,:;!?'"()[\]\-\u2013\u2014\u2026/%+=&@#*\u00ab\u00bb\u201e\u201c\u201d\u2018\u2019\u2190-\u2193]/u;
+
 const scan = (text) => {
-  if (/(?![a-z\u00c0-\u024f])\p{L}/iu.test(text)) return /letter outside Latin-1 and Latin Extended/;
+  const nfc = text.normalize("NFC");
+  if (UI_CHARS.test(nfc)) return /character outside the UI text set/;
+  // No i flag: case folding would let a letter in when its other case is in range (U+0272 and U+019D).
+  if (/(?![a-zA-Z\u00c0-\u024f])\p{L}/u.test(nfc)) return /letter outside Latin-1 and Latin Extended/;
   let folded = fold(text);
   for (const re of allowRes) folded = folded.replace(re, (m) => " ".repeat(m.length));
   return termRes.find((re) => ((re.lastIndex = 0), re.test(folded)));
