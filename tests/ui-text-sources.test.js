@@ -37,8 +37,10 @@ const stripComments = (css) => {
   }
   return out;
 };
+// A declaration can follow ;, {, } (a nested block) or whitespace: the name is found wherever it is not part of
+// a longer identifier, class or id.
 const declarations = (css, prop) =>
-  [...stripComments(css).matchAll(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`, "gi"))].map((m) => m[1].trim());
+  [...stripComments(css).matchAll(new RegExp(`(?<![-\\w.#])${prop}\\s*:\\s*([^;{}]+)`, "gi"))].map((m) => m[1].trim());
 
 // CSS can put text on the page through content, quotes, list markers and @counter-style, or pull it in
 // through url(). So: no escapes, no url(), only the at-rules below, content only "", '' or none, and a
@@ -50,7 +52,7 @@ const cssProblems = (raw) => {
   const css = stripComments(raw);
   if (/url\(|data:/i.test(css)) out.push("url");
   // A string custom property (--ff-*) may be used only as a font; text-writing properties take no var().
-  for (const m of css.matchAll(/(?:^|[;{\s])([-\w]+)\s*:\s*([^;{}]*)(?=[;}]|$)/g)) {
+  for (const m of css.matchAll(/(?<![-\w.#])([-\w]+)\s*:\s*([^;{}]*)(?=[;}]|$)/g)) {
     const prop = m[1].toLowerCase();
     const isFont = prop === "font-family" || prop === "font" || prop.startsWith("--ff-");
     if (/var\(\s*--ff-/i.test(m[2]) && !isFont) out.push(`${prop}: var(--ff-*)`);
@@ -76,9 +78,11 @@ const PACKAGES = /^(react|react-dom|next)(\/[\w/-]+)?$/;
 const importProblems = (file, text) => {
   const out = [];
   if (/\b(import|require)\s*\(\s*(?!(["'])[^"'`$]*\2\s*\))/.test(text)) out.push("computed specifier");
-  // Modules and code reached without an import: process.* other than process.env.NAME, globalThis, eval, Function.
+  // Modules and code reached without an import: process.* other than process.env.NAME, globalThis, eval, Function
+  // and .constructor (the way to Function without naming it). This reads words, not meaning: it stops slips, not
+  // a deliberately disguised name; review covers that.
   if (/\bprocess\b(?!\.env\.\w)/.test(text)) out.push("process");
-  if (/\b(globalThis|eval|Function|getBuiltinModule)\b/.test(text)) out.push("global access");
+  if (/\b(globalThis|eval|Function|getBuiltinModule|constructor)\b/.test(text)) out.push("global access");
   for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(["'`])([^"'`]*)\1/g)) {
     const spec = m[2];
     if (!spec.startsWith(".")) {
@@ -122,6 +126,7 @@ describe("UI text sources", () => {
     expect(declarations(".a{--content: 1; background-content: 2}", "content")).toEqual([]);
     expect(declarations('.a::after{content/**/: "x"} .b{content/* a\n b */:"y"}', "content")).toEqual(['"x"', '"y"']);
     expect(declarations('/* content: "x" */ .a{color:red} /* .b{content:"y"}', "content")).toEqual([]);
+    expect(declarations(".a{@media all{}content:attr(t)} .b{.c{}content:x}", "content")).toEqual(["attr(t)", "x"]);
     const bad = [
       '.x::after{/**/content:"x"}', '.x::after { color: inherit;/* sep */content: "x"; }', '.x::after { \\63 ontent: "x"; }',
       '.x::after{CONTENT:"x"}', ".x::after{content:attr(title)}", '.x{quotes:"x" ""} .x::before{content:open-quote}',
@@ -129,13 +134,15 @@ describe("UI text sources", () => {
       '.x{background:url("data:image/svg+xml,x")}', '@import "a.css";', '@font-face{font-family:"x"}', ".x{--t:'x'}",
       '.a{font-family:"/*"} .b::after{content:"x"} .c{font-family:"*/"}', ":root{--ff-q:\"x \"} .d{list-style-type:var(--ff-q)}",
       ':root{--ff-q:"x "} .e{quotes:var(--ff-q) var(--ff-q)}', ".f::after{content:var(--c)}", ".g{counter-reset:var(--c)}",
-      ".h{grid-area:var(--ff-q)}",
+      ".h{grid-area:var(--ff-q)}", ".x::before{@media all{}content:attr(t)}", ':root{--ff-q:"x"} .x::before{.y{}content:var(--ff-q)}',
+      "li{@media all{}list-style-type:var(--ff-q)}", ".x::before{}content:attr(t)", '.x{.y{}quotes:"x" "y"}',
     ];
     for (const css of bad) expect(cssProblems(css), css).not.toEqual([]);
     const good = [
       '.a::after{content:""} .b::before{content:none}', ':root{--ff-ui:"Instrument Sans", system-ui}',
       '.a{font-family:"Inter", sans-serif}', '[data-x="y"] .a{color:red}', "@media (max-width: 640px){.a{color:red}}",
       '/* .b{content:"y"} */ .a{color:red}', ".a{font-family:var(--ff-ui);color:var(--c)} .b:hover{color:red}",
+      ".content:hover{color:red} #quotes:focus{color:red} .a{.b{}color:red}",
     ];
     for (const css of good) expect(cssProblems(css), css).toEqual([]);
 
@@ -152,6 +159,7 @@ describe("UI text sources", () => {
       'export * from "../lib/a.js";', 'import x from "lodash";', 'const fs = process.getBuiltinModule("node:fs");',
       'const fs = process["getBuiltinModule"]("fs");', "const b = process.binding;", 'const f = globalThis.process;',
       'eval("x");', 'new Function("return 1")();', "const e = process.env;",
+      'const g = [].constructor.constructor("return this")();', 'const g = x["constructor"];',
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
