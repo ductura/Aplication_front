@@ -31,3 +31,18 @@ jobs:
       - name: Install Chromium for e2e
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+
+  # Aggregate check: green only when every job it needs succeeded (branch protection is not changed here).
+  ci-ok:
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All required jobs succeeded
+        env:
+          REZULTATI: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needs: $REZULTATI"
+          for r in $REZULTATI; do test "$r" = "success" || exit 1; done
+          test -n "$REZULTATI"

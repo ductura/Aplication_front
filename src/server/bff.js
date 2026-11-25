@@ -32,13 +32,46 @@ export async function procitajMutaciju(request) {
   if (!/^application\/json\s*(;|$)/i.test(request.headers.get("content-type") ?? "")) {
     return { odbijeno: odgovor({ greska: "ocekuje_se_json" }, 415) };
   }
-  const tekst = await request.text();
-  if (Buffer.byteLength(tekst, "utf8") > MAX_TIJELO) return { odbijeno: odgovor({ greska: "prevelik_zahtjev" }, 413) };
+  const bajtovi = await procitajOgranicenoTijelo(request, MAX_TIJELO);
+  if (bajtovi === null) return { odbijeno: odgovor({ greska: "prevelik_zahtjev" }, 413) };
   try {
-    return { tijelo: kaoZapis(JSON.parse(tekst)) };
+    return { tijelo: kaoZapis(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bajtovi))) };
   } catch {
     return { odbijeno: odgovor({ greska: "neispravan_json" }, 400) };
   }
+}
+
+const DULJINA = /^\d{1,9}$/;
+
+/**
+ * The body as bytes, or null when it is (or claims to be) larger than `max`
+ * bytes; after ductura/Aplication_server lib/ograniceno-tijelo.js. A malformed
+ * or too large Content-Length is refused before a byte is read; otherwise the
+ * stream is counted and cancelled as soon as it passes `max`, so at most `max`
+ * plus one chunk is held in memory. A stream error is passed on to the caller.
+ * @param {Request} request
+ * @param {number} max
+ * @returns {Promise<Buffer | null>}
+ */
+export async function procitajOgranicenoTijelo(request, max) {
+  const duljina = request.headers.get("content-length");
+  if (duljina !== null && !(DULJINA.test(duljina) && Number(duljina) <= max)) return null;
+  if (!request.body) return Buffer.alloc(0);
+  const reader = request.body.getReader();
+  /** @type {Uint8Array[]} */
+  const dijelovi = [];
+  let ukupno = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    ukupno += value.byteLength;
+    if (ukupno > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    dijelovi.push(value);
+  }
+  return Buffer.concat(dijelovi, ukupno);
 }
 
 export const nedozvoljeno = (allow) => () =>

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
@@ -59,5 +60,17 @@ describe("workflow checker", () => {
     ]));
     expect(ci.on.push.branches).toEqual(expect.arrayContaining([expect.stringMatching(/^migracija\/(?:faza2|\*\*)$/)]));
     expect(steps.find((step) => step.uses?.startsWith("actions/checkout@"))?.with?.["persist-credentials"]).toBe(false);
+  });
+
+  it("ci-ok needs every other job, always runs and passes only when all of them succeeded", () => {
+    const ci = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
+    const ok = ci.jobs["ci-ok"];
+    expect(ok.if).toBe("always()");
+    expect([ok.needs].flat().sort()).toEqual(Object.keys(ci.jobs).filter((j) => j !== "ci-ok").sort());
+    expect(ok.steps).toHaveLength(1);
+    expect(ok.steps[0].env.REZULTATI).toBe("${{ join(needs.*.result, ' ') }}");
+    const run = (rezultati) => spawnSync("bash", ["-eo", "pipefail", "-c", ok.steps[0].run], { env: { REZULTATI: rezultati } }).status;
+    expect(run("success")).toBe(0);
+    for (const r of ["failure", "cancelled", "skipped", "success failure", ""]) expect(run(r), r).not.toBe(0);
   });
 });
