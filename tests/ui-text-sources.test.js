@@ -112,6 +112,12 @@ const importProblems = (file, text) => {
       if (!PACKAGES.test(spec)) out.push(spec);
       continue;
     }
+    // A bundler reads ?query and #fragment (and may read other characters) where normalize sees path segments,
+    // so a relative path holds only word characters, ".", "/", "-" and the [ ] of dynamic route segments.
+    if (!/^\.{1,2}\/[\w./[\]-]+$/.test(spec)) {
+      out.push(spec);
+      continue;
+    }
     const target = posix.normalize(posix.join(posix.dirname(file), spec));
     if (!/^(app|src)\//.test(target) || !READ.test(target)) out.push(spec);
   }
@@ -188,12 +194,14 @@ describe("UI text sources", () => {
       'import p from /* x */ "../../poruke.json";', 'import p from // x\n "../poruke.json";',
       'export * as p from /* */ "../poruke.json";', 'import /**/ "../a.css";', 'const p = require(/**/ "../a.json");',
       'const p = await import(/**/ "../a.json");', 'export { a } from /**/ "../a.js";', "import p from",
+      'import p from "../poruke.json?/../app/x.js";', 'import p from "../poruke.json#/../app/x.js";',
+      'import p from "./a.js?raw";', 'import p from "./a b.js";', 'import p from "..\\\\poruke.json";',
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
       'import { hr } from "../src/i18n/hr.js";', 'import s from "./page.module.css";', 'import Link from "next/link";',
       'import { useState } from "react";', 'const P = await import("../src/components/Traka.jsx");',
-      "const u = process.env.APLICATION_SERVER_URL;", 'import { hr } from /* catalogue */ "../src/i18n/hr.js";',
+      "const u = process.env.APLICATION_SERVER_URL;", 'import { hr } from /* catalogue */ "../src/i18n/hr.js";', 'export { GET } from "./[id]/route.js";',
       'const s = "from \\"../a.json\\""; const t = <p className="x">{s}</p>;',
     ];
     for (const s of good) expect(importProblems("app/page.jsx", s), s).toEqual([]);
