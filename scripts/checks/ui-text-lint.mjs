@@ -3,7 +3,8 @@
 // {label}, an object, a spread or a module outside src/i18n.
 //
 // 1. A string with a letter is allowed only as a technical token: printable ASCII, no spaces, first letter
-//    lower case (paths, codes, classes, MIME types), or one of the exact values in TECHNICAL. Import
+//    lower case, and either holding a character other than a letter or hyphen (paths, MIME types, URLs) or
+//    being one of the closed list WORDS; or one of the exact values in TECHNICAL. Import
 //    sources and directives are exempt. Template literals are read piece by piece; static concatenation
 //    and joins of literal arrays are also read whole, so words cannot be glued from technical pieces.
 // 2. Inside a JSX attribute only the attributes in TECH_ATTRS may hold a literal, and there rule 1 applies
@@ -16,8 +17,8 @@
 //    letter-like symbols and numbers (So, Sk, Nl, No), separators other than space and no-break spaces,
 //    fillers, letters outside Latin-1 and Latin Extended-A/B).
 //
-// What stays open: a single lower-case ASCII word (or a template piece between expressions) outside a JSX
-// attribute passes rule 1; it is still read by rule 3. Messages never repeat the literal.
+// A bare word passes rule 1 only from WORDS, so new code words are added there under review.
+// Messages never repeat the literal.
 import { hasForbiddenTerm } from "./forbidden-terms.mjs";
 
 // Change only with review (Risk: critical): every entry is text that can reach code but never the page.
@@ -26,9 +27,25 @@ const TECH_ATTRS =
   /^(className|key|href|lang|type|id|htmlFor|name|method|rel|target|role|scope|autoComplete|inputMode|src|dir|data-[\w-]+|aria-(hidden|live|current|invalid|describedby|labelledby|controls|expanded|busy|atomic|haspopup|pressed|selected|required|disabled|modal))$/;
 
 const HIDDEN = /(?![\t\n\r])\p{Cc}|[\p{Cf}\p{Co}\p{Cn}\p{M}\u2800\u3164\uffa0\u115f\u1160]|(?![\x00-\x7f])[\p{So}\p{Sk}\p{Nl}\p{No}]|[^\P{Z} \u00a0\u202f]|(?![a-zA-Z\u00c0-\u024f])\p{L}/u;
+// Change only with review (Risk: critical): bare words (letters and hyphens only) that code may hold,
+// as codes, keys, classes and HTML values. Any other bare word fails, so a word can never pass by shape.
+const WORDS = new Set([
+  // HTML and HTTP values, JS type names
+  "alert", "button", "col", "row", "region", "submit", "number", "numeric", "off", "password", "username",
+  "current-password", "light", "sheet", "hr", "hr-HR", "post", "manual", "same-origin", "no-store", "force-dynamic",
+  "content-length", "content-type", "cookie", "set-cookie", "retry-after", "sec-fetch-site", "string", "object",
+  "true", "false", "ok", "status", "issuer", "student", "teacher", "noopener", "noreferrer",
+  // field keys and element ids
+  "aaiDomena", "aaiDomena-pomoc", "fakultetId", "korisnickoIme", "lozinka", "prijava", "prijava-greska",
+  "nova-institucija", "nova-institucija-naslov", "-greska",
+  // state and error codes mapped to the catalogue
+  "aktivna", "greska", "nedostupan", "neispravno", "nema", "nepoznato", "obavezno", "odbijeno", "odjavljen", "opce",
+  "prijavljen", "zabranjeno", "zatrazena", "zauzeto",
+]);
 const isTechnical = (t) => {
   if (!/\p{L}/u.test(t) || TECHNICAL.has(t)) return true;
-  return /^[\x21-\x7e]+$/.test(t) && /^[^A-Za-z]*[a-z]/.test(t);
+  if (!/^[\x21-\x7e]+$/.test(t) || !/^[^A-Za-z]*[a-z]/.test(t)) return false;
+  return !/^[A-Za-z-]+$/.test(t) || WORDS.has(t);
 };
 
 // The value of an expression built only from literals, or undefined.

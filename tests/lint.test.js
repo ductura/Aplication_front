@@ -40,8 +40,8 @@ describe("UI text must come from the catalogue (real eslint.config.mjs)", () => 
 
   it("catalogue text, lang, className, key and href pass", async () => {
     const code = `import Link from "next/link";\nimport { hr } from "../src/i18n/hr.js";\nconst rows = [{ id: 1 }];
-export const A = () => <html lang="hr" className="a"><h1 title={hr.app.name}>{hr.app.name}</h1>
-{rows.map((r) => <Link key={r.id} className="b" href="/">{hr.home.heading}</Link>)}</html>;\n`;
+export const A = () => <html lang="hr" className="sheet"><h1 title={hr.app.name}>{hr.app.name}</h1>
+{rows.map((r) => <Link key={r.id} className="sheet" href="/">{hr.home.heading}</Link>)}</html>;\n`;
     expect(await ruleIds(code)).toEqual([]);
   });
 });
@@ -62,6 +62,10 @@ describe("text with letters in app/ and src/ outside src/i18n is a technical tok
     ["join", 'export const a = ["dodaj", "instituciju"].join(" ");\n'],
     ["template", "export const a = (x) => `${x} dodaj instituciju`;\n"],
     ["function argument", 'export const a = (f) => f("Institucija je dodana");\n'],
+    ["one lower-case word shown as {label}", 'const label = "dodaj";\nexport const A = () => <p>{label}</p>;\n'],
+    ["one lower-case word in JSX", 'export const A = () => <p>{"dodaj"}</p>;\n'],
+    ["hyphenated words", 'export const a = "dodaj-instituciju";\n'],
+    ["one word between expressions", "export const a = (x, y) => `${x}dodaj${y}`;\n"],
   ])("fails on %s", async (_, code) => {
     expect(await ui(code)).toContain("literal");
   });
@@ -92,7 +96,8 @@ describe("text with letters in app/ and src/ outside src/i18n is a technical tok
     expect(await ui('export const A = () => <p id="dodaj instituciju" />;\n')).toContain("literal");
     expect(await ui('export const A = () => <p data-x="dodaj instituciju" />;\n')).toContain("literal");
     expect(await ui("export const ID = /^[A-Za-z0-9-]{1,64}$/;\n")).toEqual([]);
-    expect(await ui('export const A = () => <a rel="noopener noreferrer" className="a b" href="/x" />;\n')).toEqual([]);
+    expect(await ui('export const A = () => <a rel="noopener noreferrer" className="sheet" href="/x" />;\n')).toEqual([]);
+    expect(await ui('export const A = () => <p className="sheet dodaj" />;\n')).toContain("literal");
   });
 
   it("technical tokens, technical attributes and src/i18n pass", async () => {
@@ -102,8 +107,8 @@ export async function f(s, id) {
   const r = await fetch(\`/api/v1/institucije/\${id}\`, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", "Cache-Control": "no-store" } });
   return r.ok ? { greska: "zauzeto" } : ALLOW;
 }
-export const A = ({ id }) => <table className={\`sheet \${id}\`}><thead><tr><th scope="col" key="a">{id}</th></tr></thead>
-<tbody><tr><td><Link href="/x" rel="noreferrer" target="_blank" className="a b">{id}</Link></td></tr></tbody></table>;\n`;
+export const A = ({ id }) => <table className={\`sheet \${id}\`}><thead><tr><th scope="col" key="a1">{id}</th></tr></thead>
+<tbody><tr><td><Link href="/x" rel="noreferrer" target="_blank" className="sheet">{id}</Link></td></tr></tbody></table>;\n`;
     expect(await ui(code)).toEqual([]);
     expect(await ui('export const hr = { a: "Dodaj instituciju" };\n', "src/i18n/hr.js")).toEqual([]);
     expect(await ui('export const en = { a: "Dodaj instituciju" };\n', "src/i18n/en.js")).toContain("literal");
