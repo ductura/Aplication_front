@@ -45,3 +45,46 @@ export const A = () => <html lang="hr" className="a"><h1 title={hr.app.name}>{hr
     expect(await ruleIds(code)).toEqual([]);
   });
 });
+
+describe("text with letters in app/ and src/ outside src/i18n is a technical token or nothing", () => {
+  const ui = async (code, filePath = "app/fixture.jsx") =>
+    (await eslint.lintText(code, { filePath }))[0].messages
+      .filter((m) => m.ruleId === "ui-text/literal-text")
+      .map((m) => m.messageId);
+
+  it.each([
+    ["own component prop", 'const F = () => null;\nexport const A = () => <F naslov="Dodaj instituciju" />;\n'],
+    ["own component prop, lower case", 'const F = () => null;\nexport const A = () => <F naslov="dodaj" />;\n'],
+    ["constant shown as {label}", 'const label = "Dodaj instituciju";\nexport const A = () => <p>{label}</p>;\n'],
+    ["object", 'export const t = { naslov: "Dodaj" };\n'],
+    ["spread", 'export const A = () => <button {...{ "aria-label": "Dodaj" }} />;\n'],
+    ["concatenation", 'export const a = "dodaj" + " instituciju";\n'],
+    ["join", 'export const a = ["dodaj", "instituciju"].join(" ");\n'],
+    ["template", "export const a = (x) => `${x} dodaj instituciju`;\n"],
+    ["function argument", 'export const a = (f) => f("Institucija je dodana");\n'],
+  ])("fails on %s", async (_, code) => {
+    expect(await ui(code)).toContain("literal");
+  });
+
+  it("fails on text in a module outside src/i18n", async () => {
+    expect(await ui('export const poruka = "Institucija je dodana";\n', "src/lib/fixture.js")).toContain("literal");
+  });
+
+  it("reads technical places too: hidden characters fail", async () => {
+    expect(await ui('export const A = () => <p className={"a\\u200bb"} />;\n')).toContain("text");
+    expect(await ui('export const a = "a" + "\\u00ad" + "b";\n')).toContain("text");
+  });
+
+  it("technical tokens, technical attributes and src/i18n pass", async () => {
+    const code = `"use client";\nimport Link from "next/link";\nconst ALLOW = "POST";
+export async function f(s, id) {
+  if (s === "nedostupan") return "nema";
+  const r = await fetch(\`/api/v1/institucije/\${id}\`, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", "Cache-Control": "no-store" } });
+  return r.ok ? { greska: "zauzeto" } : ALLOW;
+}
+export const A = ({ id }) => <table className={\`sheet \${id}\`}><thead><tr><th scope="col" key="a">{id}</th></tr></thead>
+<tbody><tr><td><Link href="/x" rel="noreferrer" target="_blank" className="a b">{id}</Link></td></tr></tbody></table>;\n`;
+    expect(await ui(code)).toEqual([]);
+    expect(await ui('export const hr = { a: "Dodaj instituciju" };\n', "src/i18n/fixture.js")).toEqual([]);
+  });
+});
