@@ -1,4 +1,4 @@
-// ESLint rule ui-text/literal-text for app/ and src/ outside src/i18n. UI text comes only from the
+// ESLint rule ui-text/literal-text for app/ and src/ except the catalogue src/i18n/hr.js. UI text comes only from the
 // catalogue, whatever path it would take to the page: a prop of our own component, a constant shown as
 // {label}, an object, a spread or a module outside src/i18n.
 //
@@ -6,12 +6,15 @@
 //    lower case (paths, codes, classes, MIME types), or one of the exact values in TECHNICAL. Import
 //    sources and directives are exempt. Template literals are read piece by piece; static concatenation
 //    and joins of literal arrays are also read whole, so words cannot be glued from technical pieces.
-// 2. Inside a JSX attribute only the attributes in TECH_ATTRS may hold a literal (and there rule 1 is
-//    not applied); any other attribute, including props of our own components, fails even in lower case.
+// 2. Inside a JSX attribute only the attributes in TECH_ATTRS may hold a literal, and there rule 1 applies
+//    to each value (to each space-separated token of className and rel); any other attribute, including
+//    props of our own components, fails on any letter. A regex literal (shown via .source or String())
+//    is read by rule 3 and fails when its pattern reads like prose.
 // 3. Every literal, technical or not, is also read whole: static concatenation and joins of literal arrays
 //    included. It fails on a term from forbidden-terms.mjs or a character that hides or disguises text
-//    (controls other than tab and line breaks, format, private-use, unassigned, combining marks after NFC, separators other than space and
-//    no-break spaces, fillers, letters outside Latin-1 and Latin Extended-A/B).
+//    (controls other than tab and line breaks, format, private-use, unassigned, combining marks after NFC,
+//    letter-like symbols and numbers (So, Sk, Nl, No), separators other than space and no-break spaces,
+//    fillers, letters outside Latin-1 and Latin Extended-A/B).
 //
 // What stays open: a single lower-case ASCII word (or a template piece between expressions) outside a JSX
 // attribute passes rule 1; it is still read by rule 3. Messages never repeat the literal.
@@ -22,7 +25,7 @@ const TECHNICAL = new Set(["GET", "POST", "Cache-Control", "Europe/Zagreb", "=; 
 const TECH_ATTRS =
   /^(className|key|href|lang|type|id|htmlFor|name|method|rel|target|role|scope|autoComplete|inputMode|src|dir|data-[\w-]+|aria-(hidden|live|current|invalid|describedby|labelledby|controls|expanded|busy|atomic|haspopup|pressed|selected|required|disabled|modal))$/;
 
-const HIDDEN = /(?![\t\n\r])\p{Cc}|[\p{Cf}\p{Co}\p{Cn}\p{M}⠀ㅤﾠᅟᅠ]|[^\P{Z}   ]|(?![a-zA-ZÀ-ɏ])\p{L}/u;
+const HIDDEN = /(?![\t\n\r])\p{Cc}|[\p{Cf}\p{Co}\p{Cn}\p{M}\u2800\u3164\uffa0\u115f\u1160]|(?![\x00-\x7f])[\p{So}\p{Sk}\p{Nl}\p{No}]|[^\P{Z} \u00a0\u202f]|(?![a-zA-Z\u00c0-\u024f])\p{L}/u;
 const isTechnical = (t) => {
   if (!/\p{L}/u.test(t) || TECHNICAL.has(t)) return true;
   return /^[\x21-\x7e]+$/.test(t) && /^[^A-Za-z]*[a-z]/.test(t);
@@ -98,11 +101,13 @@ const literalText = {
     const shape = (node, pieces) => {
       if (isExempt(node)) return;
       const attr = attributeOf(node);
-      if (attr !== null) {
-        if (!TECH_ATTRS.test(attr) && pieces.some((t) => /\p{L}/u.test(t))) context.report({ node, messageId: "literal" });
+      if (attr !== null && !TECH_ATTRS.test(attr)) {
+        if (pieces.some((t) => /\p{L}/u.test(t))) context.report({ node, messageId: "literal" });
         return;
       }
-      if (!pieces.every(isTechnical)) context.report({ node, messageId: "literal" });
+      // className and rel hold space-separated tokens; every other value is one token.
+      const tokens = attr === "className" || attr === "rel" ? pieces.flatMap((t) => t.split(/[ \t\n\r]+/).filter(Boolean)) : pieces;
+      if (!tokens.every(isTechnical)) context.report({ node, messageId: "literal" });
     };
     // A template or an outermost + chain: each static run, and all runs joined (an empty dynamic operand
     // between them can split a term).
@@ -115,6 +120,14 @@ const literalText = {
     };
     return {
       Literal(node) {
+        if (node.regex) {
+          // A pattern can be shown through .source or String(): read it like text, and fail when it reads
+          // like prose (two words, or a capitalised word).
+          read(node, node.regex.pattern);
+          if (!isExempt(node) && /\p{L}{2,}[  ]+\p{L}{2,}|\p{Lu}\p{Ll}{2,}/u.test(node.regex.pattern))
+            context.report({ node, messageId: "literal" });
+          return;
+        }
         if (typeof node.value !== "string") return;
         read(node, node.value);
         shape(node, [node.value]);
@@ -131,11 +144,25 @@ const literalText = {
       "CallExpression[callee.property.name='join']"(node) {
         const arr = node.callee.object;
         if (arr?.type !== "ArrayExpression") return;
-        const parts = arr.elements.map(staticText);
         const sep = node.arguments.length === 0 ? "," : staticText(node.arguments[0]);
-        if (sep === undefined || !parts.every((p) => p !== undefined)) return;
-        read(node, parts.join(sep));
-        shape(node, [parts.join(sep)]);
+        if (sep === undefined) return;
+        // Holes join as "", spreads of literal arrays are expanded; anything else splits the runs.
+        const items = (elements) =>
+          elements.flatMap((e) =>
+            e === null ? [""] : e.type === "SpreadElement" ? (e.argument.type === "ArrayExpression" ? items(e.argument.elements) : [undefined]) : [staticText(e)]);
+        const runs = [];
+        let run;
+        for (const p of items(arr.elements)) {
+          if (p === undefined) {
+            if (run !== undefined) runs.push(run.join(sep));
+            run = undefined;
+          } else (run ??= []).push(p);
+        }
+        if (run !== undefined) runs.push(run.join(sep));
+        if (runs.length === 0) return;
+        for (const t of runs) read(node, t);
+        read(node, runs.join(sep));
+        shape(node, runs);
       },
     };
   },

@@ -83,6 +83,18 @@ describe("text with letters in app/ and src/ outside src/i18n is a technical tok
     expect(await ui('export const a = (x) => `${x}dodaj${" "}instituciju`;\n')).toContain("literal");
   });
 
+  it("reads regex patterns, arrays with holes or spreads, symbols and technical attribute values", async () => {
+    expect(await ui("export const A = () => <p>{/Dodaj instituciju/.source}</p>;\n")).toContain("literal");
+    expect(await ui('export const a = ["dodaj", , "instituciju"].join(" ");\n')).toContain("literal");
+    expect(await ui('export const a = (x) => ["dodaj", ...["instituciju"], ...x].join(" ");\n')).toContain("literal");
+    for (const c of ["\\u24b6", "\\u2160", "\\u00b2", "\\u02c6", "\\u{1f600}"]) expect(await ui(`export const a = "${c}";\n`)).toContain("text");
+    expect(await ui('export const A = () => <input name="Dodaj instituciju" />;\n')).toContain("literal");
+    expect(await ui('export const A = () => <p id="dodaj instituciju" />;\n')).toContain("literal");
+    expect(await ui('export const A = () => <p data-x="dodaj instituciju" />;\n')).toContain("literal");
+    expect(await ui("export const ID = /^[A-Za-z0-9-]{1,64}$/;\n")).toEqual([]);
+    expect(await ui('export const A = () => <a rel="noopener noreferrer" className="a b" href="/x" />;\n')).toEqual([]);
+  });
+
   it("technical tokens, technical attributes and src/i18n pass", async () => {
     const code = `"use client";\nimport Link from "next/link";\nconst ALLOW = "POST";
 export async function f(s, id) {
@@ -93,6 +105,7 @@ export async function f(s, id) {
 export const A = ({ id }) => <table className={\`sheet \${id}\`}><thead><tr><th scope="col" key="a">{id}</th></tr></thead>
 <tbody><tr><td><Link href="/x" rel="noreferrer" target="_blank" className="a b">{id}</Link></td></tr></tbody></table>;\n`;
     expect(await ui(code)).toEqual([]);
-    expect(await ui('export const hr = { a: "Dodaj instituciju" };\n', "src/i18n/fixture.js")).toEqual([]);
+    expect(await ui('export const hr = { a: "Dodaj instituciju" };\n', "src/i18n/hr.js")).toEqual([]);
+    expect(await ui('export const en = { a: "Dodaj instituciju" };\n', "src/i18n/en.js")).toContain("literal");
   });
 });

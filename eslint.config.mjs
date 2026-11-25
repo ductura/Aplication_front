@@ -31,7 +31,8 @@ const config = [
   {
     // Text that reaches the page without passing the rules above is still checked like the catalogue.
     files: ["app/**/*.{js,jsx,mjs}", "src/**/*.{js,jsx,mjs}"],
-    ignores: ["src/i18n/**"],
+    // Only the catalogue that tests/forbidden-terms.test.js scans is exempt.
+    ignores: ["src/i18n/hr.js"],
     plugins: { "ui-text": uiTextPlugin },
     rules: { "ui-text/literal-text": "error" },
   },
