@@ -24,7 +24,12 @@ export function kolaciciZaPreglednik(odgovor) {
   return odgovor.headers.getSetCookie().filter((c) => c.trimStart().startsWith(`${KOLACIC}=`));
 }
 
-export const obrisiKolacic = () => `${KOLACIC}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict`;
+/** Attributes of the session cookie; deleting it must repeat them or the browser may keep it. */
+const jeProdukcija = () => process.env.NODE_ENV === "production";
+
+/** Set-Cookie line that deletes ductura_admin with the same attributes as when it is set (Secure in production). */
+export const obrisiKolacic = () =>
+  `${KOLACIC}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict${jeProdukcija() ? "; Secure" : ""}`;
 
 /**
  * @param {string} putanja e.g. "/api/admin/ja"
