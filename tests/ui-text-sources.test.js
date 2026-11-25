@@ -5,17 +5,40 @@ import { describe, expect, it } from "vitest";
 
 // UI text reaches the page only through files the checks read: scripts under the lint rule
 // (eslint.config.mjs) and CSS under the content rule below. Any other entry under app/, src/ or public/
-// fails here until someone decides how it is checked. Nothing is skipped: dot directories,
-// node_modules, ignored files and links are listed too; a link is neither a file nor a directory, so it fails.
+// fails here until someone decides how it is checked. Nothing is skipped: ignored files and links are listed
+// too (a link is neither a file nor a directory, so it fails), and node_modules or dot entries fail outright.
 const READ = /\.(js|jsx|mjs|css)$/;
 const BINARY = /\.(png|ico|jpe?g|webp|avif|gif|woff2?)$/;
 const list = (dir) => (existsSync(dir) ? readdirSync(dir, { recursive: true, withFileTypes: true }) : [])
   .map((e) => ({ path: `${e.parentPath}/${e.name}`.replaceAll("\\", "/"), file: e.isFile(), dir: e.isDirectory() }));
-const rejected = (entries, ok) => entries.filter((e) => !e.dir && !(e.file && ok.test(e.path))).map((e) => e.path);
-// Comments are removed first: one between a property and its colon would hide the declaration,
-// and a declaration written inside a comment is not one.
+// node_modules and dot entries are skipped by ESLint and other tools, so none may exist under these roots.
+const HIDDEN_DIR = /(^|\/)(node_modules|\.[^/]*)(\/|$)/;
+const rejected = (entries, ok) =>
+  entries.filter((e) => HIDDEN_DIR.test(e.path) || (!e.dir && !(e.file && ok.test(e.path)))).map((e) => e.path);
+// Comments are removed first, outside strings only (a "/*" inside a string starts no comment): one between
+// a property and its colon would hide the declaration, and a declaration inside a comment is not one.
+const stripComments = (css) => {
+  let out = "";
+  for (let i = 0; i < css.length; ) {
+    const c = css[i];
+    if (c === '"' || c === "'") {
+      const end = css.indexOf(c, i + 1);
+      const j = end === -1 ? css.length : end + 1;
+      out += css.slice(i, j);
+      i = j;
+    } else if (css.startsWith("/*", i)) {
+      const end = css.indexOf("*/", i + 2);
+      out += " ";
+      i = end === -1 ? css.length : end + 2;
+    } else {
+      out += c;
+      i += 1;
+    }
+  }
+  return out;
+};
 const declarations = (css, prop) =>
-  [...css.replace(/\/\*[\s\S]*?(\*\/|$)/g, " ").matchAll(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`, "gi"))].map((m) => m[1].trim());
+  [...stripComments(css).matchAll(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`, "gi"))].map((m) => m[1].trim());
 
 // CSS can put text on the page through content, quotes, list markers and @counter-style, or pull it in
 // through url(). So: no escapes, no url(), only the at-rules below, content only "", '' or none, and a
@@ -24,8 +47,15 @@ const AT_RULES = ["media", "supports", "keyframes", "layer", "container"];
 const cssProblems = (raw) => {
   const out = [];
   if (raw.includes("\\")) out.push("escape");
-  const css = raw.replace(/\/\*[\s\S]*?(\*\/|$)/g, " ");
+  const css = stripComments(raw);
   if (/url\(|data:/i.test(css)) out.push("url");
+  // A string custom property (--ff-*) may be used only as a font; text-writing properties take no var().
+  for (const m of css.matchAll(/(?:^|[;{\s])([-\w]+)\s*:\s*([^;{}]*)(?=[;}]|$)/g)) {
+    const prop = m[1].toLowerCase();
+    const isFont = prop === "font-family" || prop === "font" || prop.startsWith("--ff-");
+    if (/var\(\s*--ff-/i.test(m[2]) && !isFont) out.push(`${prop}: var(--ff-*)`);
+    if (/^(content|quotes|list-style(-type)?|counter-(reset|set|increment))$/.test(prop) && /var\(/i.test(m[2])) out.push(`${prop}: var()`);
+  }
   for (const m of css.matchAll(/@([\w-]+)/g)) if (!AT_RULES.includes(m[1].toLowerCase())) out.push(`@${m[1]}`);
   for (const m of css.matchAll(/"[^"]*"|'[^']*'/g)) {
     if (m[0].length === 2) continue;
@@ -46,6 +76,9 @@ const PACKAGES = /^(react|react-dom|next)(\/[\w/-]+)?$/;
 const importProblems = (file, text) => {
   const out = [];
   if (/\b(import|require)\s*\(\s*(?!(["'])[^"'`$]*\2\s*\))/.test(text)) out.push("computed specifier");
+  // Modules and code reached without an import: process.* other than process.env.NAME, globalThis, eval, Function.
+  if (/\bprocess\b(?!\.env\.\w)/.test(text)) out.push("process");
+  if (/\b(globalThis|eval|Function|getBuiltinModule)\b/.test(text)) out.push("global access");
   for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(["'`])([^"'`]*)\1/g)) {
     const spec = m[2];
     if (!spec.startsWith(".")) {
@@ -71,7 +104,8 @@ describe("UI text sources", () => {
     const entries = [
       f("app/a.tsx"), f("app/a.ts"), f("src/a.cjs"), f("src/a.mts"), f("src/a.json"), f("app/icon.svg"), f("app/a.md"),
       f("app/manifest.webmanifest"), f("src/node_modules/x/index.d.ts"), f("app/.x/a.html"), f("src/a.jsx.txt"),
-      { path: "src/link", file: false, dir: false },
+      { path: "src/link", file: false, dir: false }, f("app/node_modules/a.js"), f("src/.x/a.js"), f("app/.a.js"),
+      { path: "app/node_modules", file: false, dir: true }, { path: "src/.x", file: false, dir: true },
     ];
     expect(rejected(entries, READ)).toEqual(entries.map((e) => e.path));
     expect(rejected([f("app/page.jsx"), f("src/a.mjs"), f("app/globals.css"), { path: "app/x", file: false, dir: true }], READ)).toEqual([]);
@@ -93,12 +127,15 @@ describe("UI text sources", () => {
       '.x::after{CONTENT:"x"}', ".x::after{content:attr(title)}", '.x{quotes:"x" ""} .x::before{content:open-quote}',
       '.x{list-style-type:"x "}', '@counter-style r{symbols:"x"} .x{list-style:r}', ".x{list-style-image:url(a.png)}",
       '.x{background:url("data:image/svg+xml,x")}', '@import "a.css";', '@font-face{font-family:"x"}', ".x{--t:'x'}",
+      '.a{font-family:"/*"} .b::after{content:"x"} .c{font-family:"*/"}', ":root{--ff-q:\"x \"} .d{list-style-type:var(--ff-q)}",
+      ':root{--ff-q:"x "} .e{quotes:var(--ff-q) var(--ff-q)}', ".f::after{content:var(--c)}", ".g{counter-reset:var(--c)}",
+      ".h{grid-area:var(--ff-q)}",
     ];
     for (const css of bad) expect(cssProblems(css), css).not.toEqual([]);
     const good = [
       '.a::after{content:""} .b::before{content:none}', ':root{--ff-ui:"Instrument Sans", system-ui}',
       '.a{font-family:"Inter", sans-serif}', '[data-x="y"] .a{color:red}', "@media (max-width: 640px){.a{color:red}}",
-      '/* .b{content:"y"} */ .a{color:red}',
+      '/* .b{content:"y"} */ .a{color:red}', ".a{font-family:var(--ff-ui);color:var(--c)} .b:hover{color:red}",
     ];
     for (const css of good) expect(cssProblems(css), css).toEqual([]);
 
@@ -112,12 +149,15 @@ describe("UI text sources", () => {
       'import p from "../poruke.json";', 'import p from "../../poruke.json" with { type: "json" };', 'import p from "./a.json";',
       'import { readFileSync } from "node:fs";', 'import fs from "fs";', 'const p = require("../poruke.json");',
       "const p = await import(name);", "const p = await import(`./${n}.js`);", 'import x from "../scripts/a.mjs";',
-      'export * from "../lib/a.js";', 'import x from "lodash";',
+      'export * from "../lib/a.js";', 'import x from "lodash";', 'const fs = process.getBuiltinModule("node:fs");',
+      'const fs = process["getBuiltinModule"]("fs");', "const b = process.binding;", 'const f = globalThis.process;',
+      'eval("x");', 'new Function("return 1")();', "const e = process.env;",
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
       'import { hr } from "../src/i18n/hr.js";', 'import s from "./page.module.css";', 'import Link from "next/link";',
       'import { useState } from "react";', 'const P = await import("../src/components/Traka.jsx");',
+      "const u = process.env.APLICATION_SERVER_URL;",
     ];
     for (const s of good) expect(importProblems("app/page.jsx", s), s).toEqual([]);
 
