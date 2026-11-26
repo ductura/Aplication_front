@@ -26,7 +26,11 @@ test.afterEach(() => {
   expect(greskeKonzole).toEqual([]);
 });
 
+// After router.refresh() Next streams the metadata again, so for a moment the document may have no <title>
+// and axe reports document-title (base 18fe770, run 45758071081). Wait for the title the layout sets, as
+// admin.spec.js does; every axe rule still runs.
 async function bezNalaza(page) {
+  await expect(page).toHaveTitle(/\S/);
   const { violations } = await new AxeBuilder({ page }).analyze();
   expect(violations.filter((v) => ["serious", "critical"].includes(v.impact)).map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`)).toEqual([]);
 }
