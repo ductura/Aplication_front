@@ -117,7 +117,8 @@ const specifiers = (text) => {
 };
 // Environment variables reach the page with text from next.config.mjs (env), .env files or the host, none of
 // which the checks read, so scripts may name only these. The server URL is used for requests, never shown.
-const ENV_NAMES = ["APLICATION_SERVER_URL"];
+// NODE_ENV (APF#16) is set by Next itself to development, production or test and only picks a code path.
+const ENV_NAMES = ["APLICATION_SERVER_URL", "NODE_ENV"];
 // next.config.mjs can also put values into the bundle (env, compiler.define, webpack, turbopack rules), so it
 // may hold only these keys; a new one is added here under review.
 const NEXT_CONFIG_KEYS = ["basePath", "poweredByHeader", "reactStrictMode", "agentRules", "allowedDevOrigins"];
@@ -294,6 +295,7 @@ describe("UI text sources", () => {
       'import p from "../poruke.json?/../app/x.js";', 'import p from "../poruke.json#/../app/x.js";',
       'import p from "./a.js?raw";', 'import p from "./a b.js";', 'import p from "..\\\\poruke.json";',
       "const t = process.env.QA_TEKST;", "const t = process.env.APLICATION_SERVER_URL_X;", "const t = process.env.NEXT_PUBLIC_X;",
+      "const t = process.env.NODE_ENV_X;",
       'const u = new URL("../scripts/qa/a.txt", import.meta.url);', 'const u = new URL(/**/ "../a.txt", import.meta . url);',
       "const u = import.meta.resolve(x);", "const m = import.meta;", 'const c = require.context("../scripts", true);',
       'const r = require.resolve("../a.txt");', 'const r = __webpack_require__.u("x");',
@@ -304,7 +306,8 @@ describe("UI text sources", () => {
     const good = [
       'import { hr } from "../src/i18n/hr.js";', 'import s from "./page.module.css";', 'import Link from "next/link";',
       'import { useState } from "react";', 'const P = await import("../src/components/Traka.jsx");',
-      "const u = process.env.APLICATION_SERVER_URL;", 'import { hr } from /* catalogue */ "../src/i18n/hr.js";', 'export { GET } from "./[id]/route.js";',
+      "const u = process.env.APLICATION_SERVER_URL;", 'const dev = process.env.NODE_ENV !== "production";',
+      'import { hr } from /* catalogue */ "../src/i18n/hr.js";', 'export { GET } from "./[id]/route.js";',
       'const s = "from \\"../a.json\\""; const t = <p className="x">{s}</p>;',
       'const host = new URL(web).hostname;',
     ];
