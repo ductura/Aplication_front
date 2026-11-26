@@ -92,9 +92,11 @@ const cssProblems = (raw) => {
   return out;
 };
 
-// Scripts under app/ and src/ import only from app/ and src/ (files the checks read) or from these packages;
-// a JSON file, fs or a computed specifier would bring text past the lint rule.
-const PACKAGES = /^(react|react-dom|next)(\/[\w/-]+)?$/;
+// Scripts under app/ and src/ import only from app/ and src/ (files the checks read) or from these package
+// entries; a JSON file, fs or a computed specifier would bring text past the lint rule. The list is closed:
+// next/dist/** holds modules that read files (QA on APF#18: next/dist/lib/find-config returned a package.json
+// key to the page), so a new entry is added here under review, never a whole package.
+const PACKAGES = new Set(["react", "next/link", "next/navigation", "next/headers"]);
 // Specifiers are read from the syntax tree (ESLint's own parser), so a comment or line break between the
 // keyword and the string cannot hide one.
 const linter = new Linter();
@@ -195,7 +197,7 @@ const importProblems = (file, text) => {
   for (const spec of specs) {
     if (spec === null) continue;
     if (!spec.startsWith(".")) {
-      if (!PACKAGES.test(spec)) out.push(spec);
+      if (!PACKAGES.has(spec)) out.push(spec);
       continue;
     }
     // A bundler reads ?query and #fragment (and may read other characters) where normalize sees path segments,
@@ -297,7 +299,11 @@ describe("UI text sources", () => {
       'import p from "../poruke.json";', 'import p from "../../poruke.json" with { type: "json" };', 'import p from "./a.json";',
       'import { readFileSync } from "node:fs";', 'import fs from "fs";', 'const p = require("../poruke.json");',
       "const p = await import(name);", "const p = await import(`./${n}.js`);", 'import x from "../scripts/a.mjs";',
-      'export * from "../lib/a.js";', 'import x from "lodash";', 'const fs = process.getBuiltinModule("node:fs");',
+      'export * from "../lib/a.js";', 'import x from "lodash";',
+      // QA on APF#18: internal next modules read files; only the listed public entries pass.
+      'import { findConfig } from "next/dist/lib/find-config";', 'import x from "next/dist/compiled/find-up";',
+      'import x from "next/dist/server/config";', 'import x from "react/package.json";', 'import x from "next";',
+      'import x from "react-dom/server";', 'const fs = process.getBuiltinModule("node:fs");',
       'const fs = process["getBuiltinModule"]("fs");', "const b = process.binding;", 'const f = globalThis.process;',
       'eval("x");', 'new Function("return 1")();', "const e = process.env;",
       'const g = [].constructor.constructor("return this")();', 'const g = x["constructor"];',
