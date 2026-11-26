@@ -72,5 +72,6 @@ describe("workflow checker", () => {
     const run = (rezultati) => spawnSync("bash", ["-eo", "pipefail", "-c", ok.steps[0].run], { env: { REZULTATI: rezultati } }).status;
     expect(run("success")).toBe(0);
     for (const r of ["failure", "cancelled", "skipped", "success failure", ""]) expect(run(r), r).not.toBe(0);
-  });
+    // Six real bash runs; on a loaded Windows machine they took over 5 s.
+  }, 60_000);
 });
