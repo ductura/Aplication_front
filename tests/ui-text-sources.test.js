@@ -139,6 +139,8 @@ const importProblems = (file, text) => {
   // meaning: it stops slips, not a deliberately disguised name; review covers that.
   if (new RegExp(`\\bprocess\\b(?!\\.env\\.(${ENV_NAMES.join("|")})\\b)`).test(text)) out.push("process");
   if (/\b(globalThis|eval|Function|getBuiltinModule|constructor)\b/.test(text)) out.push("global access");
+  // Text built from char codes, base64 or percent escapes holds no letters for the lint rule to read.
+  if (/\b(fromCharCode|fromCodePoint|atob|decodeURI|decodeURIComponent|unescape)\b/.test(text)) out.push("text from codes");
   for (const spec of specs) {
     if (spec === null) continue;
     if (!spec.startsWith(".")) {
@@ -181,6 +183,21 @@ describe("UI text sources", () => {
   it("the repository has no script files the lint rule does not read", () => {
     const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" });
     expect(files.split("\n").filter((f) => /\.(cjs|cts|mts|ts|tsx)$/.test(f))).toEqual([]);
+  });
+
+  // Next loads some root entries on its own, with no import (pages/, proxy.*, middleware.*, instrumentation*.*),
+  // and the lint rule reads only app/ and src/. So the root holds only the entries below; any other one fails
+  // until someone decides how it is checked.
+  it("the repository root holds only reviewed entries", () => {
+    const ROOT = new Set([
+      ".github", ".gitignore", "app", "src", "public", "scripts", "tests", "README.md", "package.json", "pnpm-lock.yaml",
+      "eslint.config.mjs", "next.config.mjs", "playwright.config.mjs", "vitest.config.mjs",
+    ]);
+    const outside = (paths) => [...new Set(paths.filter(Boolean).map((p) => p.split("/")[0]))].filter((e) => !ROOT.has(e));
+    expect(outside(["pages/zz.jsx", "proxy.js", "middleware.js", "instrumentation-client.js", "src/a.js", "app/page.jsx"]))
+      .toEqual(["pages", "proxy.js", "middleware.js", "instrumentation-client.js"]);
+    const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" });
+    expect(outside(files.split("\n"))).toEqual([]);
   });
 
   it("no CSS file under app/ or src/ writes text", () => {
@@ -237,6 +254,8 @@ describe("UI text sources", () => {
       'const u = new URL("../scripts/qa/a.txt", import.meta.url);', 'const u = new URL(/**/ "../a.txt", import.meta . url);',
       "const u = import.meta.resolve(x);", "const m = import.meta;", 'const c = require.context("../scripts", true);',
       'const r = require.resolve("../a.txt");', 'const r = __webpack_require__.u("x");',
+      "const t = String.fromCharCode(80, 114);", "const t = String.fromCodePoint(80);", 'const t = atob("UHJvYmE=");',
+      'const t = decodeURIComponent("%50roba");', 'const t = decodeURI("%50");', 'const t = unescape("%50");',
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
