@@ -111,12 +111,18 @@ const walk = (text, visitors) => {
 };
 const specifiers = (text) => {
   const found = [];
-  const add = (node) => found.push(node?.type === "Literal" && typeof node.value === "string" ? node.value : null);
+  // Import attributes (`with { ... }`) and the options of import() count as computed: Turbopack reads
+  // turbopackLoader, turbopackAs and turbopackModuleType there and turns a .module.css into JavaScript whose
+  // text no check reads (QA on APF#18). No script in the repo uses them.
+  const add = (node, n) => found.push(
+    node?.type === "Literal" && typeof node.value === "string" && !n?.attributes?.length && !n?.assertions?.length && !n?.options
+      ? node.value : null,
+  );
   const parsed = walk(text, {
-    ImportDeclaration: (n) => add(n.source),
-    ExportAllDeclaration: (n) => add(n.source),
-    ExportNamedDeclaration: (n) => n.source && add(n.source),
-    ImportExpression: (n) => add(n.source),
+    ImportDeclaration: (n) => add(n.source, n),
+    ExportAllDeclaration: (n) => add(n.source, n),
+    ExportNamedDeclaration: (n) => n.source && add(n.source, n),
+    ImportExpression: (n) => add(n.source, n),
     CallExpression: (n) => n.callee.type === "Identifier" && n.callee.name === "require" && add(n.arguments[0]),
     // new URL("<path>", import.meta.url), import.meta.resolve and require.context / require.resolve make the
     // bundler emit or resolve a file without an import; none is read here, so each counts as computed.
@@ -186,7 +192,7 @@ const nextConfigProblems = (text) => {
 const importProblems = (file, text) => {
   const out = [];
   const specs = specifiers(text);
-  if (specs.includes(null)) out.push("computed specifier, import.meta, require.* or unparsed file");
+  if (specs.includes(null)) out.push("computed specifier, import attributes, import.meta, require.* or unparsed file");
   // Modules and code reached without an import: process.* other than process.env.<a name in ENV_NAMES>,
   // globalThis, eval, Function and .constructor (the way to Function without naming it). This reads words, not
   // meaning: it stops slips, not a deliberately disguised name; review covers that.
@@ -319,6 +325,13 @@ describe("UI text sources", () => {
       'const r = require.resolve("../a.txt");', 'const r = __webpack_require__.u("x");',
       "const t = String.fromCharCode(80, 114);", "const t = String.fromCodePoint(80);", 'const t = atob("UHJvYmE=");',
       'const t = decodeURIComponent("%50roba");', 'const t = decodeURI("%50");', 'const t = unescape("%50");',
+      // QA on APF#18: import attributes make Turbopack load a reviewed path as something else.
+      'import qa from "./page.module.css" with { turbopackLoader: "../src/lib/qa-loader.js", turbopackAs: "*.js" };',
+      'import qa from "./page.module.css" with { turbopackAs: "*.js" };',
+      'import qa from "./page.module.css" with { turbopackModuleType: "raw" };',
+      'export { default } from "./page.module.css" with { turbopackAs: "*.js" };',
+      'export * from "./page.module.css" with { turbopackAs: "*.js" };',
+      'const qa = await import("./page.module.css", { with: { turbopackAs: "*.js" } });',
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
