@@ -161,7 +161,7 @@ describe("posaljiPonovi maps BFF answers", () => {
     const f = sOdgovorom(200);
     await posaljiPonovi(ID, f);
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe(`/admin/api/v1/institucije/${ID}/ponovi`);
+    expect(url).toBe(`/administracija/api/v1/institucije/${ID}/ponovi`);
     expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
     expect(await posaljiPonovi(ID, async () => Promise.reject(new TypeError("x")))).toBe("nedostupan");
   });
@@ -171,7 +171,7 @@ describe("posaljiPonovi maps BFF answers", () => {
   });
 });
 
-describe("POST /admin/api/institucije/{id}/ponovi", () => {
+describe("POST /administracija/api/institucije/{id}/ponovi", () => {
   let pozivi;
   let odgovor;
   beforeEach(() => {
@@ -185,7 +185,7 @@ describe("POST /admin/api/institucije/{id}/ponovi", () => {
     });
   });
   const zahtjev = (zaglavlja = {}, tijelo = "{}") =>
-    new Request(`http://127.0.0.1:3120/admin/api/institucije/${ID}/ponovi`, {
+    new Request(`http://127.0.0.1:3120/administracija/api/institucije/${ID}/ponovi`, {
       method: "POST",
       headers: { "content-type": "application/json", "sec-fetch-site": "same-origin", cookie: "ductura_admin=s1; drugi=x", ...zaglavlja },
       body: tijelo,
@@ -237,7 +237,7 @@ describe("POST /admin/api/institucije/{id}/ponovi", () => {
   });
 });
 
-describe("POST /admin/api/v1/institucije/{id}/ponovi", () => {
+describe("POST /administracija/api/v1/institucije/{id}/ponovi", () => {
   it("is the same handler the browser button calls through api()", () => {
     for (const m of ["POST", "GET", "PUT", "PATCH", "DELETE"]) expect(ponoviV1[m]).toBe(ponovi[m]);
   });

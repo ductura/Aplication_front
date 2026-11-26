@@ -1,4 +1,4 @@
-// POST /admin/api/institucije -> Aplication_server POST /api/admin/institutions.
+// POST /administracija/api/institucije -> Aplication_server POST /api/admin/institutions.
 // Answers 201 {institucija} or {greska, polja} with an error code per field.
 import { greskaStvaranja, normalizirajDomenu, provjeriUnos, ULOGE } from "../../../src/lib/institucija.js";
 import { pozoviServer, procitajJson } from "../../../src/server/aplication-server.js";

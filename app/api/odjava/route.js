@@ -1,4 +1,4 @@
-// POST /admin/api/odjava -> Aplication_server POST /api/admin/odjava. The
+// POST /administracija/api/odjava -> Aplication_server POST /api/admin/odjava. The
 // cookie is cleared here as well, so logout works even when the server is down.
 import { kolaciciZaPreglednik, obrisiKolacic, pozoviServer } from "../../../src/server/aplication-server.js";
 import { kolacicZahtjeva, nedozvoljeno, odgovor, procitajMutaciju } from "../../../src/server/bff.js";

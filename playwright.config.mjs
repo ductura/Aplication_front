@@ -22,7 +22,7 @@ export default defineConfig({
     {
       command: `pnpm build && pnpm exec next start -H 127.0.0.1 -p ${APP}`,
       env: { APLICATION_SERVER_URL: `http://127.0.0.1:${LAZNI}`, NEXT_TELEMETRY_DISABLED: "1" },
-      url: `http://127.0.0.1:${APP}/admin/prijava`,
+      url: `http://127.0.0.1:${APP}/administracija/prijava`,
       timeout: 240_000,
       reuseExistingServer: false,
     },

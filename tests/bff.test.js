@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 const zahtjev = (putanja, tijelo, zaglavlja = {}) =>
-  new Request(`http://127.0.0.1:3120/admin/api${putanja}`, {
+  new Request(`http://127.0.0.1:3120/administracija/api${putanja}`, {
     method: "POST",
     headers: { "content-type": "application/json", "sec-fetch-site": "same-origin", ...zaglavlja },
     body: typeof tijelo === "string" ? tijelo : JSON.stringify(tijelo),
@@ -48,7 +48,7 @@ describe("cookie handling", () => {
   });
 });
 
-describe("POST /admin/api/prijava", () => {
+describe("POST /administracija/api/prijava", () => {
   const podaci = { korisnickoIme: "admin-test", lozinka: "lozinka-samo-za-test" };
 
   it("forwards the credentials and returns the session cookie", async () => {
@@ -89,7 +89,7 @@ describe("POST /admin/api/prijava", () => {
   });
 });
 
-describe("POST /admin/api/odjava", () => {
+describe("POST /administracija/api/odjava", () => {
   it("forwards the cookie and passes back the server's clearing cookie", async () => {
     odgovori.push(json(204, null, { "set-cookie": "ductura_admin=; Path=/; Max-Age=0" }));
     const res = await odjava.POST(zahtjev("/odjava", {}, { cookie: "ductura_admin=s1; drugi=x" }));
@@ -127,7 +127,7 @@ describe("obrisiKolacic", () => {
   });
 });
 
-describe("POST /admin/api/institucije", () => {
+describe("POST /administracija/api/institucije", () => {
   const unos = { fakultetId: "fpzg", aaiDomena: " FPZG.hr ", racuni: { student: 200, teacher: 50, network_engineer: 3, institution_admin: 1 } };
   const sKolacicem = (t) => zahtjev("/institucije", t, { cookie: "ductura_admin=s1" });
 
@@ -179,7 +179,7 @@ describe("bounded request body (16 KB)", () => {
   const kodiraj = new TextEncoder();
   const zaglavlja = { "content-type": "application/json", "sec-fetch-site": "same-origin" };
   const tok = (body, dodatno = {}) =>
-    new Request("http://127.0.0.1:3120/admin/api/v1/prijava", { method: "POST", headers: { ...zaglavlja, ...dodatno }, body, duplex: "half" });
+    new Request("http://127.0.0.1:3120/administracija/api/v1/prijava", { method: "POST", headers: { ...zaglavlja, ...dodatno }, body, duplex: "half" });
   /** A 1 MB stream of 4 KB chunks (far past the limit, but finite so an unbounded reader fails the assertions instead of exhausting memory) that records how far it was read and whether it was cancelled. */
   const beskonacno = () => {
     const stanje = { procitano: 0, otkazano: false };
