@@ -232,7 +232,8 @@ describe("UI text sources", () => {
   // until someone decides how it is checked.
   it("the repository root holds only reviewed entries", () => {
     const ROOT = new Set([
-      ".github", ".gitignore", "app", "src", "public", "scripts", "tests", "README.md", "package.json", "pnpm-lock.yaml",
+      // .env.example (APF#16) lists variable names for local setup; Next does not load it.
+      ".env.example", ".github", ".gitignore", "app", "src", "public", "scripts", "tests", "README.md", "package.json", "pnpm-lock.yaml",
       "eslint.config.mjs", "next.config.mjs", "playwright.config.mjs", "vitest.config.mjs",
     ]);
     const outside = (paths) => [...new Set(paths.filter(Boolean).map((p) => p.split("/")[0]))].filter((e) => !ROOT.has(e));
