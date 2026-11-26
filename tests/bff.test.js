@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as institucije from "../app/api/v1/institucije/route.js";
 import * as odjava from "../app/api/v1/odjava/route.js";
 import * as prijava from "../app/api/v1/prijava/route.js";
-import { izvuciKolacic, kolaciciZaPreglednik } from "../src/server/aplication-server.js";
+import { izvuciKolacic, kolaciciZaPreglednik, obrisiKolacic } from "../src/server/aplication-server.js";
 import { procitajMutaciju } from "../src/server/bff.js";
 
 let pozivi;
@@ -103,6 +103,27 @@ describe("POST /admin/api/odjava", () => {
     const res = await odjava.POST(zahtjev("/odjava", {}, { cookie: "ductura_admin=s1" }));
     expect(res.status).toBe(204);
     expect(res.headers.getSetCookie()[0]).toMatch(/^ductura_admin=; Path=\/; Max-Age=0; HttpOnly; SameSite=Strict$/);
+  });
+});
+
+describe("obrisiKolacic", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("adds Secure in production, like the cookie it deletes", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(obrisiKolacic()).toBe("ductura_admin=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict; Secure");
+  });
+
+  it("omits Secure outside production so local http still works", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(obrisiKolacic()).not.toMatch(/Secure/);
+  });
+
+  it("clears the cookie with Secure from the logout route when the server is down (production)", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    odgovori.push(new TypeError("fetch failed"));
+    const res = await odjava.POST(zahtjev("/odjava", {}, { cookie: "ductura_admin=s1" }));
+    expect(res.headers.getSetCookie()[0]).toMatch(/; Secure$/);
   });
 });
 
