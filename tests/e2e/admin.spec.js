@@ -19,7 +19,7 @@ test.beforeEach(async ({ page, request }) => {
     // their real status; only those are allowed, nothing else.
     const ocekivano =
       /^Failed to load resource: the server responded with a status of (400|401|409|429) /.test(m.text()) &&
-      /\/admin\/api\/v1\/(prijava|institucije)$/.test(m.location().url);
+      /\/administracija\/api\/v1\/(prijava|institucije)$/.test(m.location().url);
     if (!ocekivano) greskeKonzole.push(m.text());
   });
   page.on("pageerror", (e) => greskeKonzole.push(String(e)));
@@ -37,29 +37,29 @@ async function bezOzbiljnihNalaza(page) {
 }
 
 async function prijavi(page) {
-  await page.goto("/admin/prijava");
+  await page.goto("/administracija/prijava");
   await page.getByLabel(hr.prijava.korisnickoIme).fill(ADMIN.ime);
   await page.getByLabel(hr.prijava.lozinka).fill(ADMIN.lozinka);
   const prijava = page.waitForResponse((res) =>
-    new URL(res.url()).pathname === "/admin/api/v1/prijava" && res.request().method() === "POST",
+    new URL(res.url()).pathname === "/administracija/api/v1/prijava" && res.request().method() === "POST",
   );
   await page.getByRole("button", { name: hr.prijava.posalji }).click();
   expect((await prijava).status()).toBe(204);
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/administracija$/);
   await expect(page.getByRole("heading", { name: hr.home.heading })).toBeVisible();
 }
 
-test("without a session /admin goes to the login page", async ({ page }) => {
-  await page.goto("/admin");
-  await expect(page).toHaveURL(/\/admin\/prijava$/);
-  await page.goto("/admin/institucije/00000000-0000-0000-0000-000000000000");
-  await expect(page).toHaveURL(/\/admin\/prijava$/);
+test("without a session /administracija goes to the login page", async ({ page }) => {
+  await page.goto("/administracija");
+  await expect(page).toHaveURL(/\/administracija\/prijava$/);
+  await page.goto("/administracija/institucije/00000000-0000-0000-0000-000000000000");
+  await expect(page).toHaveURL(/\/administracija\/prijava$/);
   await expect(page.getByRole("heading", { name: hr.prijava.naslov })).toBeVisible();
   await bezOzbiljnihNalaza(page);
 });
 
 test("login shows 401 and 429 messages, then signs in", async ({ page }) => {
-  await page.goto("/admin/prijava");
+  await page.goto("/administracija/prijava");
   await page.getByRole("button", { name: hr.prijava.posalji }).click();
   await expect(page.locator("#prijava-greska")).toHaveText(hr.prijava.obavezno);
 
@@ -76,8 +76,8 @@ test("login shows 401 and 429 messages, then signs in", async ({ page }) => {
   await prijavi(page);
   await expect(page.getByText(hr.institucije.prazno)).toBeVisible();
   await expect(page.getByText(hr.traka.prijavljen(ADMIN.ime))).toBeVisible();
-  await page.goto("/admin/prijava");
-  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto("/administracija/prijava");
+  await expect(page).toHaveURL(/\/administracija$/);
 });
 
 test("adds an institution and follows its instance to active", async ({ page }) => {
@@ -98,7 +98,7 @@ test("adds an institution and follows its instance to active", async ({ page }) 
   await bezOzbiljnihNalaza(page);
   await page.getByRole("button", { name: o.posalji }).click();
 
-  await expect(page).toHaveURL(/\/admin\/institucije\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/administracija\/institucije\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1, name: "Fakultet Jantar" })).toBeVisible();
   const stanje = page.getByRole("status");
   await expect(stanje).toContainText(hr.instanca.stanja.zatrazena);
@@ -118,8 +118,8 @@ test("shows errors per field: invalid input, taken faculty and taken domain", as
   await page.getByRole("button", { name: hr.institucije.dodaj }).click();
   await page.getByLabel(o.fakultet).selectOption("demo-jantar");
   await page.getByRole("button", { name: o.posalji }).click();
-  await expect(page).toHaveURL(/\/admin\/institucije\//);
-  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/administracija\/institucije\//);
+  await page.goto("/administracija");
 
   await page.getByRole("button", { name: hr.institucije.dodaj }).click();
   await expect(page.getByRole("option", { name: o.vecDodan("Fakultet Jantar") })).toBeDisabled();
@@ -167,7 +167,16 @@ test("a refused instance shows the reason and stops refreshing", async ({ page }
 test("logout ends the session", async ({ page }) => {
   await prijavi(page);
   await page.getByRole("button", { name: hr.traka.odjava }).click();
-  await expect(page).toHaveURL(/\/admin\/prijava$/);
-  await page.goto("/admin");
-  await expect(page).toHaveURL(/\/admin\/prijava$/);
+  await expect(page).toHaveURL(/\/administracija\/prijava$/);
+  await page.goto("/administracija");
+  await expect(page).toHaveURL(/\/administracija\/prijava$/);
+});
+
+// Address map D-318: the old base path is gone from the app; the edge
+// redirects /admin/... to /administracija/... (301) before it reaches here.
+test("the old /admin base path is not served by the app", async ({ page }) => {
+  for (const stara of ["/admin", "/admin/prijava", "/admin/api/v1/prijava"]) {
+    const res = await page.request.get(stara, { maxRedirects: 0 });
+    expect(res.status(), stara).toBe(404);
+  }
 });

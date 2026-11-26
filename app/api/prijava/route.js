@@ -1,4 +1,4 @@
-// POST /admin/api/prijava -> Aplication_server POST /api/admin/prijava.
+// POST /administracija/api/prijava -> Aplication_server POST /api/admin/prijava.
 import { kolaciciZaPreglednik, pozoviServer } from "../../../src/server/aplication-server.js";
 import { nedozvoljeno, odgovor, procitajMutaciju } from "../../../src/server/bff.js";
 

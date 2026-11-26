@@ -1,4 +1,4 @@
-// POST /admin/api/institucije/{id}/ponovi -> Aplication_server POST /api/admin/institutions/{id}/ponovi.
+// POST /administracija/api/institucije/{id}/ponovi -> Aplication_server POST /api/admin/institutions/{id}/ponovi.
 // Retries the instance start for an institution that is still zatrazena or u_izradi.
 // Answers 200 {institucija: {id, stanje}} or {greska} with the status the browser should act on.
 import { pozoviServer, procitajJson } from "../../../../../src/server/aplication-server.js";
