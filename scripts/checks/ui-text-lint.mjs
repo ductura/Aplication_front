@@ -22,7 +22,7 @@
 import { hasForbiddenTerm } from "./forbidden-terms.mjs";
 
 // Change only with review (Risk: critical): every entry is text that can reach code but never the page.
-const TECHNICAL = new Set(["GET", "POST", "Cache-Control", "Europe/Zagreb", "=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"]);
+const TECHNICAL = new Set(["GET", "POST", "Cache-Control", "Europe/Zagreb", "=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict", "; Secure"]);
 const TECH_ATTRS =
   /^(className|key|href|lang|type|id|htmlFor|name|method|rel|target|role|scope|autoComplete|inputMode|src|dir|data-[\w-]+|aria-(hidden|live|current|invalid|describedby|labelledby|controls|expanded|busy|atomic|haspopup|pressed|selected|required|disabled|modal))$/;
 
@@ -34,7 +34,7 @@ const WORDS = new Set([
   "alert", "button", "col", "row", "region", "submit", "number", "numeric", "off", "password", "username",
   "current-password", "light", "sheet", "hr", "hr-HR", "post", "manual", "same-origin", "no-store", "force-dynamic",
   "content-length", "content-type", "cookie", "set-cookie", "retry-after", "sec-fetch-site", "string", "object",
-  "true", "false", "ok", "status", "issuer", "student", "teacher", "noopener", "noreferrer",
+  "true", "false", "ok", "status", "issuer", "student", "teacher", "noopener", "noreferrer", "production",
   // field keys and element ids
   "aaiDomena", "aaiDomena-pomoc", "fakultetId", "korisnickoIme", "lozinka", "prijava", "prijava-greska",
   "nova-institucija", "nova-institucija-naslov", "-greska",
