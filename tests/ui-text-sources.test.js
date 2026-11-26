@@ -81,30 +81,50 @@ const PACKAGES = /^(react|react-dom|next)(\/[\w/-]+)?$/;
 // Specifiers are read from the syntax tree (ESLint's own parser), so a comment or line break between the
 // keyword and the string cannot hide one.
 const linter = new Linter();
+// Runs the visitors over the parsed file; returns false when the file does not parse.
+const walk = (text, visitors) => {
+  const plugin = { rules: { s: { create: () => visitors } } };
+  const messages = linter.verify(text, [{
+    languageOptions: { ecmaVersion: "latest", sourceType: "module", parserOptions: { ecmaFeatures: { jsx: true } } },
+    plugins: { x: plugin }, rules: { "x/s": "error" },
+  }], { filename: "x.js" });
+  return !messages.some((m) => m.fatal);
+};
 const specifiers = (text) => {
   const found = [];
   const add = (node) => found.push(node?.type === "Literal" && typeof node.value === "string" ? node.value : null);
-  const plugin = { rules: { s: { create: () => ({
+  const parsed = walk(text, {
     ImportDeclaration: (n) => add(n.source),
     ExportAllDeclaration: (n) => add(n.source),
     ExportNamedDeclaration: (n) => n.source && add(n.source),
     ImportExpression: (n) => add(n.source),
     CallExpression: (n) => n.callee.type === "Identifier" && n.callee.name === "require" && add(n.arguments[0]),
-  }) } } };
-  const messages = linter.verify(text, [{
-    languageOptions: { ecmaVersion: "latest", sourceType: "module", parserOptions: { ecmaFeatures: { jsx: true } } },
-    plugins: { x: plugin }, rules: { "x/s": "error" },
-  }], { filename: "x.js" });
-  return messages.some((m) => m.fatal) ? [null] : found;
+  });
+  return parsed ? found : [null];
 };
+// Every object key in a file (null for a computed key or a file that does not parse).
+const objectKeys = (text) => {
+  const found = [];
+  const parsed = walk(text, {
+    Property: (n) => found.push(n.computed ? null : n.key.name ?? String(n.key.value)),
+    SpreadElement: () => found.push(null),
+  });
+  return parsed ? found : [null];
+};
+// Environment variables reach the page with text from next.config.mjs (env), .env files or the host, none of
+// which the checks read, so scripts may name only these. The server URL is used for requests, never shown.
+const ENV_NAMES = ["APLICATION_SERVER_URL"];
+// next.config.mjs can also put values into the bundle (env, compiler.define, webpack, turbopack rules), so it
+// may hold only these keys; a new one is added here under review.
+const NEXT_CONFIG_KEYS = ["basePath", "poweredByHeader", "reactStrictMode", "agentRules", "allowedDevOrigins"];
 const importProblems = (file, text) => {
   const out = [];
   const specs = specifiers(text);
   if (specs.includes(null)) out.push("computed specifier or unparsed file");
-  // Modules and code reached without an import: process.* other than process.env.NAME, globalThis, eval, Function
-  // and .constructor (the way to Function without naming it). This reads words, not meaning: it stops slips, not
-  // a deliberately disguised name; review covers that.
-  if (/\bprocess\b(?!\.env\.\w)/.test(text)) out.push("process");
+  // Modules and code reached without an import: process.* other than process.env.<a name in ENV_NAMES>,
+  // globalThis, eval, Function and .constructor (the way to Function without naming it). This reads words, not
+  // meaning: it stops slips, not a deliberately disguised name; review covers that.
+  if (new RegExp(`\\bprocess\\b(?!\\.env\\.(${ENV_NAMES.join("|")})\\b)`).test(text)) out.push("process");
   if (/\b(globalThis|eval|Function|getBuiltinModule|constructor)\b/.test(text)) out.push("global access");
   for (const spec of specs) {
     if (spec === null) continue;
@@ -196,6 +216,7 @@ describe("UI text sources", () => {
       'const p = await import(/**/ "../a.json");', 'export { a } from /**/ "../a.js";', "import p from",
       'import p from "../poruke.json?/../app/x.js";', 'import p from "../poruke.json#/../app/x.js";',
       'import p from "./a.js?raw";', 'import p from "./a b.js";', 'import p from "..\\\\poruke.json";',
+      "const t = process.env.QA_TEKST;", "const t = process.env.APLICATION_SERVER_URL_X;", "const t = process.env.NEXT_PUBLIC_X;",
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
@@ -209,5 +230,16 @@ describe("UI text sources", () => {
     const scripts = [...list("app"), ...list("src")].filter((e) => e.file && /\.(js|jsx|mjs)$/.test(e.path));
     expect(scripts.length).toBeGreaterThan(0);
     for (const { path } of scripts) expect(importProblems(path, readFileSync(path, "utf8")), path).toEqual([]);
+  });
+
+  it("next.config.mjs holds only reviewed keys, so it puts no value into the bundle", () => {
+    const extra = (text) => objectKeys(text).filter((k) => !NEXT_CONFIG_KEYS.includes(k));
+    for (const s of [
+      'export default { env: { A: "x" } };', 'export default { compiler: { define: { A: "x" } } };',
+      'export default { ["env"]: {} };', "const e = { A: 1 }; export default { ...e };", "export default { webpack: (c) => c };",
+      "export default {",
+    ]) expect(extra(s), s).not.toEqual([]);
+    expect(extra("export default { basePath: B, reactStrictMode: true };")).toEqual([]);
+    expect(extra(readFileSync("next.config.mjs", "utf8"))).toEqual([]);
   });
 });
