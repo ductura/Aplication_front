@@ -95,7 +95,8 @@ describe("workflow checker", () => {
     for (const job of ["ci", "secret-scan"]) expect(run(needs({ ...all, [job]: "skipped" })), `${job} skipped`).not.toBe(0);
     for (const bad of ["", "{}", "[]", "not json", JSON.stringify({ ci: {} })]) expect(run(bad), bad).not.toBe(0);
     expect(run(needs({ ...all, "dependency-review": "skipped" }), "")).not.toBe(0);
-  });
+    // Many real bash runs; on a loaded Windows machine six of them took over 5 s.
+  }, 60_000);
 
   it("dependabot updates github-actions and npm weekly, grouped, with a cooldown", () => {
     const { version, updates } = parse(readFileSync(".github/dependabot.yml", "utf8"));
