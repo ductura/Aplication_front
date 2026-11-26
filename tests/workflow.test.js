@@ -62,16 +62,51 @@ describe("workflow checker", () => {
     expect(steps.find((step) => step.uses?.startsWith("actions/checkout@"))?.with?.["persist-credentials"]).toBe(false);
   });
 
+  const SHARED = /^ductura\/\.github\/\.github\/workflows\/(secret-scan|dependency-review)\.yml@[0-9a-f]{40}$/;
+  const ciDoc = () => parse(readFileSync(".github/workflows/ci.yml", "utf8"));
+
+  it("calls the shared secret scan and dependency review pinned to a SHA; the review runs only on pull requests", () => {
+    const { jobs } = ciDoc();
+    expect(jobs["secret-scan"].uses).toMatch(SHARED);
+    expect(jobs["secret-scan"].uses).toContain("secret-scan.yml@");
+    expect(jobs["dependency-review"].uses).toMatch(SHARED);
+    expect(jobs["dependency-review"].uses).toContain("dependency-review.yml@");
+    expect(jobs["dependency-review"].if).toBe("${{ github.event_name == 'pull_request' }}");
+    expect(jobs["secret-scan"].if).toBeUndefined();
+  });
+
   it("ci-ok needs every other job, always runs and passes only when all of them succeeded", () => {
-    const ci = parse(readFileSync(".github/workflows/ci.yml", "utf8"));
+    const ci = ciDoc();
     const ok = ci.jobs["ci-ok"];
-    expect(ok.if).toBe("always()");
+    expect(ok.if).toBe("${{ always() }}");
+    expect(ok.permissions).toEqual({});
     expect([ok.needs].flat().sort()).toEqual(Object.keys(ci.jobs).filter((j) => j !== "ci-ok").sort());
     expect(ok.steps).toHaveLength(1);
-    expect(ok.steps[0].env.REZULTATI).toBe("${{ join(needs.*.result, ' ') }}");
-    const run = (rezultati) => spawnSync("bash", ["-eo", "pipefail", "-c", ok.steps[0].run], { env: { REZULTATI: rezultati } }).status;
-    expect(run("success")).toBe(0);
-    for (const r of ["failure", "cancelled", "skipped", "success failure", ""]) expect(run(r), r).not.toBe(0);
-    // Six real bash runs; on a loaded Windows machine they took over 5 s.
+    expect(ok.steps[0].env.RESULTS).toBe("${{ toJSON(needs) }}");
+    expect(ok.steps[0].env.ALLOW_SKIPPED).toBe("dependency-review");
+    const needs = (r) => JSON.stringify(Object.fromEntries(Object.entries(r).map(([k, v]) => [k, { result: v, outputs: {} }])));
+    const run = (results, skipped = ok.steps[0].env.ALLOW_SKIPPED) => spawnSync("bash", ["-eo", "pipefail", "-c", ok.steps[0].run], { env: { ...process.env, RESULTS: results, ALLOW_SKIPPED: skipped } }).status;
+    const all = { ci: "success", "secret-scan": "success", "dependency-review": "success" };
+    expect(run(needs(all))).toBe(0);
+    expect(run(needs({ ...all, "dependency-review": "skipped" }))).toBe(0);
+    for (const job of Object.keys(all)) {
+      for (const r of ["failure", "cancelled"]) expect(run(needs({ ...all, [job]: r })), `${job} ${r}`).not.toBe(0);
+    }
+    for (const job of ["ci", "secret-scan"]) expect(run(needs({ ...all, [job]: "skipped" })), `${job} skipped`).not.toBe(0);
+    for (const bad of ["", "{}", "[]", "not json", JSON.stringify({ ci: {} })]) expect(run(bad), bad).not.toBe(0);
+    expect(run(needs({ ...all, "dependency-review": "skipped" }), "")).not.toBe(0);
+    // Many real bash runs; on a loaded Windows machine six of them took over 5 s.
   }, 60_000);
+
+  it("dependabot updates github-actions and npm weekly, grouped, with a cooldown", () => {
+    const { version, updates } = parse(readFileSync(".github/dependabot.yml", "utf8"));
+    expect(version).toBe(2);
+    expect(updates.map((u) => u["package-ecosystem"]).sort()).toEqual(["github-actions", "npm"]);
+    for (const u of updates) {
+      expect(u.directory).toBe("/");
+      expect(u.schedule.interval).toBe("weekly");
+      expect(Object.keys(u.groups).length).toBeGreaterThan(0);
+      expect(u.cooldown["default-days"]).toBeGreaterThan(0);
+    }
+  });
 });

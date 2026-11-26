@@ -32,17 +32,51 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
 
-  # Aggregate check: green only when every job it needs succeeded (branch protection is not changed here).
+  # Shared scans from ductura/.github, pinned to a full SHA (DAN-1555).
+  secret-scan:
+    uses: ductura/.github/.github/workflows/secret-scan.yml@97c31e9178438ef0d7e663a609cea1b459a3e3aa # v0 main nakon .github#89
+
+  # Only a pull request has something to compare, so the job is skipped on push;
+  # ci-ok allows exactly that skip (allow-skipped below).
+  dependency-review:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: ductura/.github/.github/workflows/dependency-review.yml@97c31e9178438ef0d7e663a609cea1b459a3e3aa # v0 main nakon .github#89
+
+  # The one required status: a plain job, so the check is named exactly ci-ok.
+  # Body is the block of ductura/.github ci-ok.yml (between ci-ok:begin and ci-ok:end).
+  # Green only when every job above succeeded; failure, cancelled or a missing result fails it.
   ci-ok:
-    needs: [ci]
-    if: always()
+    if: ${{ always() }}
+    needs: [ci, secret-scan, dependency-review]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions: {}
     steps:
-      - name: All required jobs succeeded
+      - name: Every needed job succeeded
+        shell: bash
         env:
-          REZULTATI: ${{ join(needs.*.result, ' ') }}
+          RESULTS: ${{ toJSON(needs) }}
+          ALLOW_SKIPPED: dependency-review
         run: |
-          echo "needs: $REZULTATI"
-          for r in $REZULTATI; do test "$r" = "success" || exit 1; done
-          test -n "$REZULTATI"
+          # ci-ok:begin
+          set -euo pipefail
+          if ! jq -e 'type == "object" and length > 0' >/dev/null 2>&1 <<< "$RESULTS"; then
+            echo "::error::results must be a non-empty JSON object; pass toJSON(needs) from a job with needs"
+            exit 1
+          fi
+          allowed="$(tr -s ' \t\r\n' '\n' <<< "$ALLOW_SKIPPED" | sed '/^$/d' | jq -R . | jq -sc .)"
+          problems="$(jq -r --argjson allowed "$allowed" '
+            (($allowed - keys) | map("allow-skipped names a job that is not in needs: \(.)"))
+            + (to_entries | map(
+                ((.value | objects | .result) // "missing") as $r
+                | if $r == "success" then empty
+                  elif $r == "skipped" and (.key as $k | $allowed | index($k)) then empty
+                  else "job \(.key) result: \($r)" end))
+            | .[]' <<< "$RESULTS")"
+          if [ -n "$problems" ]; then
+            while IFS= read -r line; do echo "::error::$line"; done <<< "$problems"
+            exit 1
+          fi
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$RESULTS"
+          echo "ci-ok: $(jq length <<< "$RESULTS") job(s) passed"
+          # ci-ok:end
