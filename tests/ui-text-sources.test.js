@@ -115,21 +115,63 @@ const specifiers = (text) => {
   });
   return parsed ? found : [null];
 };
-// Every object key in a file (null for a computed key or a file that does not parse).
-const objectKeys = (text) => {
-  const found = [];
-  const parsed = walk(text, {
-    Property: (n) => found.push(n.computed ? null : n.key.name ?? String(n.key.value)),
-    SpreadElement: () => found.push(null),
-  });
-  return parsed ? found : [null];
-};
 // Environment variables reach the page with text from next.config.mjs (env), .env files or the host, none of
 // which the checks read, so scripts may name only these. The server URL is used for requests, never shown.
 const ENV_NAMES = ["APLICATION_SERVER_URL"];
 // next.config.mjs can also put values into the bundle (env, compiler.define, webpack, turbopack rules), so it
 // may hold only these keys; a new one is added here under review.
 const NEXT_CONFIG_KEYS = ["basePath", "poweredByHeader", "reactStrictMode", "agentRules", "allowedDevOrigins"];
+// The names next.config.mjs may import, by module; a value may be only one of these, a string, number or
+// boolean literal, or an array of such literals.
+const NEXT_CONFIG_IMPORTS = { "./src/lib/putanje.js": ["BASE_PATH"] };
+// The file is read as a whole, not by its keys: only reviewed imports, one const holding an object literal
+// and the default export of that const (or of an object literal). Any other statement (an assignment such as
+// `config.compiler = ...`, Object.assign, a second binding, a named export) is a problem, so no value reaches
+// the config outside the reviewed literal.
+const nextConfigProblems = (text) => {
+  let program = null;
+  if (!walk(text, { Program: (n) => (program = n) }) || program === null) return ["does not parse"];
+  const out = [];
+  const imported = new Set();
+  const objects = [];
+  let bound = null;
+  let exported = 0;
+  for (const s of program.body) {
+    if (s.type === "ImportDeclaration") {
+      const names = NEXT_CONFIG_IMPORTS[s.source.value];
+      for (const sp of s.specifiers) {
+        const name = sp.type === "ImportSpecifier" && sp.imported.type === "Identifier" ? sp.imported.name : null;
+        if (!names?.includes(name) || sp.local.name !== name) out.push(`import ${sp.local.name} from ${s.source.value}`);
+        else imported.add(name);
+      }
+      if (s.specifiers.length === 0) out.push(`import ${s.source.value}`);
+    } else if (
+      s.type === "VariableDeclaration" && s.kind === "const" && bound === null && s.declarations.length === 1 &&
+      s.declarations[0].id.type === "Identifier" && s.declarations[0].init?.type === "ObjectExpression"
+    ) {
+      bound = s.declarations[0].id.name;
+      objects.push(s.declarations[0].init);
+    } else if (s.type === "ExportDefaultDeclaration" && exported === 0 && s.declaration.type === "ObjectExpression") {
+      exported++;
+      objects.push(s.declaration);
+    } else if (s.type === "ExportDefaultDeclaration" && exported === 0 && s.declaration.type === "Identifier" && s.declaration.name === bound) {
+      exported++;
+    } else out.push(`statement ${s.type}`);
+  }
+  if (exported !== 1 || objects.length !== 1) out.push("not one exported object literal");
+  const plain = (v) => v?.type === "Literal" && ["string", "number", "boolean"].includes(typeof v.value);
+  for (const object of objects) {
+    for (const p of object.properties) {
+      const key = p.type === "Property" && !p.computed && p.kind === "init" && !p.method ? (p.key.name ?? String(p.key.value)) : null;
+      if (key === null || !NEXT_CONFIG_KEYS.includes(key)) { out.push(`key ${key}`); continue; }
+      const v = p.value;
+      const ok = plain(v) || (v.type === "Identifier" && imported.has(v.name)) ||
+        (v.type === "ArrayExpression" && v.elements.every(plain));
+      if (!ok) out.push(`value of ${key}`);
+    }
+  }
+  return out;
+};
 const importProblems = (file, text) => {
   const out = [];
   const specs = specifiers(text);
@@ -272,14 +314,30 @@ describe("UI text sources", () => {
     for (const { path } of scripts) expect(importProblems(path, readFileSync(path, "utf8")), path).toEqual([]);
   });
 
-  it("next.config.mjs holds only reviewed keys, so it puts no value into the bundle", () => {
-    const extra = (text) => objectKeys(text).filter((k) => !NEXT_CONFIG_KEYS.includes(k));
+  it("next.config.mjs is one reviewed object literal, so it puts no value into the bundle", () => {
+    const imp = 'import { BASE_PATH } from "./src/lib/putanje.js";\n';
     for (const s of [
       'export default { env: { A: "x" } };', 'export default { compiler: { define: { A: "x" } } };',
       'export default { ["env"]: {} };', "const e = { A: 1 }; export default { ...e };", "export default { webpack: (c) => c };",
-      "export default {",
-    ]) expect(extra(s), s).not.toEqual([]);
-    expect(extra("export default { basePath: B, reactStrictMode: true };")).toEqual([]);
-    expect(extra(readFileSync("next.config.mjs", "utf8"))).toEqual([]);
+      "export default { webpack(c) { return c; } };", "export default {",
+      // A key set outside the literal: by assignment, Object.assign or a value read at load time.
+      `const c = { reactStrictMode: true }; c.compiler = JSON.parse('{"define":{"a":"1"}}'); export default c;`,
+      'const c = { reactStrictMode: true }; Object.assign(c, { env: { A: "x" } }); export default c;',
+      `const c = { reactStrictMode: true }; c["env"] = {}; export default c;`,
+      "export default { basePath: JSON.parse('\"/x\"') };", "export default { basePath: `/${1}` };",
+      "export default { poweredByHeader: /x/ };", "export default { allowedDevOrigins: [B] };",
+      "export default { basePath: B };", 'import { other } from "./src/lib/putanje.js"; export default { basePath: other };',
+      'import * as p from "./src/lib/putanje.js"; export default { basePath: p.BASE_PATH };',
+      'import { BASE_PATH } from "./other.js"; export default { basePath: BASE_PATH };', 'import "./side-effect.js"; export default {};',
+      // Bindings and exports beyond the one config.
+      "let c = {}; export default c;", "const c = {}; const d = c; export default c;", "const c = {}; export default d;",
+      'export const env = { A: "x" }; export default {};', "export default {}; export default {};",
+      "export default function config() { return {}; }", "const c = {}; export default c; c.env = {};", "",
+    ]) expect(nextConfigProblems(s), s).not.toEqual([]);
+    for (const s of [
+      `${imp}export default { basePath: BASE_PATH, reactStrictMode: true };`,
+      `${imp}const nextConfig = { basePath: BASE_PATH, allowedDevOrigins: ["127.0.0.1"] };\nexport default nextConfig;`,
+    ]) expect(nextConfigProblems(s), s).toEqual([]);
+    expect(nextConfigProblems(readFileSync("next.config.mjs", "utf8"))).toEqual([]);
   });
 });
