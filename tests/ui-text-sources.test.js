@@ -47,6 +47,10 @@ const declarations = (css, prop) =>
 // through url(). So: no escapes, no url(), only the at-rules below, content only "", '' or none, and a
 // non-empty string only in a selector or as a font-family / --ff-* value.
 const AT_RULES = ["media", "supports", "keyframes", "layer", "container"];
+const LIST_STYLE = [
+  "none", "disc", "circle", "square", "decimal", "disclosure-open", "disclosure-closed", "inside", "outside",
+  "inherit", "initial", "unset", "revert", "revert-layer",
+];
 const cssProblems = (raw) => {
   const out = [];
   if (raw.includes("\\")) out.push("escape");
@@ -60,6 +64,11 @@ const cssProblems = (raw) => {
     const isFont = prop === "font-family" || prop === "font" || prop.startsWith("--ff-");
     if (/var\(\s*--ff-/i.test(m[2]) && !isFont) out.push(`${prop}: var(--ff-*)`);
     if (/^(content|quotes|list-style(-type)?|counter-(reset|set|increment))$/.test(prop) && /var\(/i.test(m[2])) out.push(`${prop}: var()`);
+    // A built-in alphabetic or roman marker style writes any short word from a counter value, so markers take
+    // only the symbols and digits in LIST_STYLE.
+    if (/^list-style(-type)?$/.test(prop) && !m[2].split(/[\s,()/]+/).filter(Boolean).every((t) => LIST_STYLE.includes(t.toLowerCase()))) {
+      out.push(`${prop}: ${m[2].trim()}`);
+    }
   }
   for (const m of css.matchAll(/@([\w-]+)/g)) if (!AT_RULES.includes(m[1].toLowerCase())) out.push(`@${m[1]}`);
   for (const m of css.matchAll(/"[^"]*"|'[^']*'/g)) {
@@ -99,6 +108,10 @@ const specifiers = (text) => {
     ExportNamedDeclaration: (n) => n.source && add(n.source),
     ImportExpression: (n) => add(n.source),
     CallExpression: (n) => n.callee.type === "Identifier" && n.callee.name === "require" && add(n.arguments[0]),
+    // new URL("<path>", import.meta.url), import.meta.resolve and require.context / require.resolve make the
+    // bundler emit or resolve a file without an import; none is read here, so each counts as computed.
+    MetaProperty: () => found.push(null),
+    MemberExpression: (n) => n.object.type === "Identifier" && /^(require|module|__webpack_require__)$/.test(n.object.name) && found.push(null),
   });
   return parsed ? found : [null];
 };
@@ -120,7 +133,7 @@ const NEXT_CONFIG_KEYS = ["basePath", "poweredByHeader", "reactStrictMode", "age
 const importProblems = (file, text) => {
   const out = [];
   const specs = specifiers(text);
-  if (specs.includes(null)) out.push("computed specifier or unparsed file");
+  if (specs.includes(null)) out.push("computed specifier, import.meta, require.* or unparsed file");
   // Modules and code reached without an import: process.* other than process.env.<a name in ENV_NAMES>,
   // globalThis, eval, Function and .constructor (the way to Function without naming it). This reads words, not
   // meaning: it stops slips, not a deliberately disguised name; review covers that.
@@ -187,6 +200,9 @@ describe("UI text sources", () => {
       "li{@media all{}list-style-type:var(--ff-q)}", ".x::before{}content:attr(t)", '.x{.y{}quotes:"x" "y"}',
       ".q{list-style-type:attr(data-q)}", "li{list-style:attr(data-q) inside}", "q{quotes:attr(data-a) attr(data-b)}",
       ".x{text-emphasis-style:attr(data-q)}", ".x{text-emphasis-style:'x'}",
+      "main{display:list-item;list-style:lower-alpha inside;counter-set:list-item 322957}", "ol{list-style-type:upper-alpha}",
+      "li{LIST-STYLE-TYPE:Lower-Roman}", "li::marker{}li{list-style:outside lower-latin}", ".x{.y{}list-style-type:georgian}",
+      "li{list-style:symbols(cyclic disc)}", "li{list-style-type:hiragana}",
     ];
     for (const css of bad) expect(cssProblems(css), css).not.toEqual([]);
     const good = [
@@ -194,6 +210,7 @@ describe("UI text sources", () => {
       '.a{font-family:"Inter", sans-serif}', '[data-x="y"] .a{color:red}', "@media (max-width: 640px){.a{color:red}}",
       '/* .b{content:"y"} */ .a{color:red}', ".a{font-family:var(--ff-ui);color:var(--c)} .b:hover{color:red}",
       ".content:hover{color:red} #quotes:focus{color:red} .a{.b{}color:red}",
+      "ul{list-style:none} ol{list-style-type:decimal} li{list-style:disc inside;counter-reset:list-item 3}",
     ];
     for (const css of good) expect(cssProblems(css), css).toEqual([]);
 
@@ -217,6 +234,9 @@ describe("UI text sources", () => {
       'import p from "../poruke.json?/../app/x.js";', 'import p from "../poruke.json#/../app/x.js";',
       'import p from "./a.js?raw";', 'import p from "./a b.js";', 'import p from "..\\\\poruke.json";',
       "const t = process.env.QA_TEKST;", "const t = process.env.APLICATION_SERVER_URL_X;", "const t = process.env.NEXT_PUBLIC_X;",
+      'const u = new URL("../scripts/qa/a.txt", import.meta.url);', 'const u = new URL(/**/ "../a.txt", import.meta . url);',
+      "const u = import.meta.resolve(x);", "const m = import.meta;", 'const c = require.context("../scripts", true);',
+      'const r = require.resolve("../a.txt");', 'const r = __webpack_require__.u("x");',
     ];
     for (const s of bad) expect(importProblems("app/page.jsx", s), s).not.toEqual([]);
     const good = [
@@ -224,6 +244,7 @@ describe("UI text sources", () => {
       'import { useState } from "react";', 'const P = await import("../src/components/Traka.jsx");',
       "const u = process.env.APLICATION_SERVER_URL;", 'import { hr } from /* catalogue */ "../src/i18n/hr.js";', 'export { GET } from "./[id]/route.js";',
       'const s = "from \\"../a.json\\""; const t = <p className="x">{s}</p>;',
+      'const host = new URL(web).hostname;',
     ];
     for (const s of good) expect(importProblems("app/page.jsx", s), s).toEqual([]);
 
