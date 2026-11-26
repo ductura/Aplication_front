@@ -84,12 +84,19 @@ describe("detail page: states and retry button", () => {
     ["zatrazena", true],
     ["u_izradi", true],
     ["aktivna", false],
-    ["greska", false],
+    ["greska", true],
   ])("state %s shows the retry button: %s", async (stanje, prikazan) => {
     const html = await sa({ stanje, kodGreske: stanje === "greska" ? "domena_zauzeta" : null });
     expect(html).toContain(hr.instanca.stanja[stanje]);
     expect(html.includes(hr.ponovi.gumb)).toBe(prikazan);
-    expect(html.includes(hr.instanca.osvjezava)).toBe(prikazan);
+    expect(html.includes(hr.instanca.osvjezava)).toBe(stanje === "zatrazena" || stanje === "u_izradi");
+  });
+
+  it("the button for greska says it resends the request and appears once", async () => {
+    const html = await sa({ stanje: "greska", kodGreske: "domena_zauzeta" });
+    expect(html).toContain(hr.ponovi.pomocGreska);
+    expect(html.split(hr.ponovi.gumb).length - 1).toBe(1);
+    expect(html).toContain(hr.instanca.kodovi.domena_zauzeta);
   });
 
   it("a refused instance shows its reason", async () => {

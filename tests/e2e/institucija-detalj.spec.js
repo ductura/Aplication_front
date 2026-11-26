@@ -76,7 +76,7 @@ test("a requested instance shows its history and the retry button turns it activ
   await bezNalaza(page);
 });
 
-test("the retry button is shown for a requested instance and not for an active or refused one", async ({ page, request }) => {
+test("the retry button is shown for a requested instance and not for an active one", async ({ page, request }) => {
   const zatrazena = await pripremi(page, request);
   await page.goto(`/admin/institucije/${zatrazena}`);
   await expect(page.getByRole("button", { name: hr.ponovi.gumb })).toBeVisible();
@@ -84,7 +84,6 @@ test("the retry button is shown for a requested instance and not for an active o
 
   for (const [fakultetId, aaiDomena, provisioning] of [
     ["demo-sjever", "demo-sjever.example", { stanje: "aktivna", aktivirano: "2026-11-18T22:05:00Z" }],
-    ["demo-otok", "demo-otok.example", { stanje: "greska", kodGreske: "domena_zauzeta" }],
   ]) {
     const res = await request.post(`${LAZNI}/api/admin/institutions`, {
       headers: { cookie: `ductura_admin=${(await page.context().cookies()).find((c) => c.name === "ductura_admin").value}` },
@@ -98,6 +97,20 @@ test("the retry button is shown for a requested instance and not for an active o
     await expect(page.getByText(hr.instanca.osvjezava)).toHaveCount(0);
     await bezNalaza(page);
   }
+});
+
+test("a refused instance shows its reason and the retry button, and the retry turns it active", async ({ page, request }) => {
+  const id = await pripremi(page, request, {
+    provisioning: { stanje: "greska", kodGreske: "domena_zauzeta", pokusaja: 1 },
+  });
+  await page.goto(`/admin/institucije/${id}`);
+  await expect(page.getByText(hr.instanca.kodovi.domena_zauzeta)).toBeVisible();
+  await expect(page.getByText(hr.ponovi.pomocGreska)).toBeVisible();
+  await bezNalaza(page);
+  await page.getByRole("button", { name: hr.ponovi.gumb }).click();
+  await expect(page.getByRole("status").first()).toContainText(hr.instanca.stanja.aktivna, { timeout: 10_000 });
+  await expect(page.getByRole("button", { name: hr.ponovi.gumb })).toHaveCount(0);
+  await bezNalaza(page);
 });
 
 test("an unknown institution shows that it was not found, without a button", async ({ page, request }) => {
@@ -120,9 +133,9 @@ test("a retry that the server refuses with 409 shows that the state changed", as
   await page.goto(`/admin/institucije/${id}`);
   await expect(page.getByRole("button", { name: hr.ponovi.gumb })).toBeVisible();
   // The state changes behind the page's back; the click is answered with 409.
-  await request.post(`${LAZNI}/__stanje/${id}`, { data: { provisioning: { stanje: "greska", kodGreske: "domena_zauzeta" } } });
+  await request.post(`${LAZNI}/__stanje/${id}`, { data: { provisioning: { stanje: "aktivna" } } });
   await page.getByRole("button", { name: hr.ponovi.gumb }).click();
-  await expect(page.getByRole("status")).toContainText(hr.instanca.stanja.greska, { timeout: 10_000 });
+  await expect(page.getByRole("status")).toContainText(hr.instanca.stanja.aktivna, { timeout: 10_000 });
   await expect(page.getByRole("button", { name: hr.ponovi.gumb })).toHaveCount(0);
 });
 
