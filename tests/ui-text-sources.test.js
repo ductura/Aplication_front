@@ -73,6 +73,12 @@ const cssProblems = (raw) => {
   for (const m of css.matchAll(/@([\w-]+)/g)) if (!AT_RULES.includes(m[1].toLowerCase())) out.push(`@${m[1]}`);
   for (const m of css.matchAll(/"[^"]*"|'[^']*'/g)) {
     if (m[0].length === 2) continue;
+    // The checks below find a string's property and block by the nearest ; { or }, so a string holding one
+    // would point them at the wrong place (QA on APF#18: quotes: "x;font-family:" "{"). No string holds them.
+    if (/[;{}]/.test(m[0])) {
+      out.push(`string with ; { or }: ${m[0]}`);
+      continue;
+    }
     const after = css.slice(m.index + m[0].length);
     if (after[after.search(/[;{}]/)] === "{") continue;
     const before = css.slice(0, m.index);
@@ -81,6 +87,8 @@ const cssProblems = (raw) => {
     if (prop !== "font-family" && !prop.startsWith("--ff-")) out.push(`${prop}: ${m[0]}`);
   }
   for (const v of declarations(raw, "content")) if (!/^(""|''|none)$/.test(v)) out.push(`content: ${v}`);
+  // quotes writes its strings through <q> and open-quote, so it takes only keywords.
+  for (const v of declarations(raw, "quotes")) if (!/^(auto|none|inherit|initial|unset|revert|revert-layer)$/i.test(v)) out.push(`quotes: ${v}`);
   return out;
 };
 
@@ -264,6 +272,9 @@ describe("UI text sources", () => {
       "main{display:list-item;list-style:lower-alpha inside;counter-set:list-item 322957}", "ol{list-style-type:upper-alpha}",
       "li{LIST-STYLE-TYPE:Lower-Roman}", "li::marker{}li{list-style:outside lower-latin}", ".x{.y{}list-style-type:georgian}",
       "li{list-style:symbols(cyclic disc)}", "li{list-style-type:hiragana}",
+      // QA on APF#18: a ; or { inside a string misled the property and selector lookup.
+      'q{quotes:"Proba QA;font-family:" "{"}', 'q{quotes:"x" "}"}', '.a{font-family:"x;y"}', "[data-x='{'] .a{color:red}",
+      "q{quotes:'«' '»'}",
     ];
     for (const css of bad) expect(cssProblems(css), css).not.toEqual([]);
     const good = [
@@ -272,6 +283,7 @@ describe("UI text sources", () => {
       '/* .b{content:"y"} */ .a{color:red}', ".a{font-family:var(--ff-ui);color:var(--c)} .b:hover{color:red}",
       ".content:hover{color:red} #quotes:focus{color:red} .a{.b{}color:red}",
       "ul{list-style:none} ol{list-style-type:decimal} li{list-style:disc inside;counter-reset:list-item 3}",
+      "q{quotes:none} blockquote{quotes:auto}",
     ];
     for (const css of good) expect(cssProblems(css), css).toEqual([]);
 
