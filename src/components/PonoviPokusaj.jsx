@@ -30,10 +30,11 @@ export async function posaljiPonovi(id, dohvati = fetch) {
   }
 }
 
-// Shown only while the instance is zatrazena or u_izradi (the page decides).
-export default function PonoviPokusaj({ id }) {
+// Shown only while the instance is zatrazena, u_izradi or greska (the page decides).
+export default function PonoviPokusaj({ id, izGreske = false }) {
   const router = useRouter();
   const [saljem, postaviSaljem] = useState(false);
+  const [poslano, postaviPoslano] = useState(false);
   const [greska, postaviGresku] = useState(
     /** @type {"nema" | "nije_ponovljivo" | "nedostupan" | "opce" | null} */ (null),
   );
@@ -41,10 +42,14 @@ export default function PonoviPokusaj({ id }) {
   async function klik() {
     postaviSaljem(true);
     postaviGresku(null);
+    postaviPoslano(false);
     const ishod = await posaljiPonovi(id);
     if (ishod === "prijava") return router.replace("/prijava");
     postaviSaljem(false);
-    if (ishod === "ok") return router.refresh();
+    if (ishod === "ok") {
+      postaviPoslano(true);
+      return router.refresh();
+    }
     postaviGresku(ishod);
     if (ishod === "nije_ponovljivo") router.refresh();
   }
@@ -54,7 +59,12 @@ export default function PonoviPokusaj({ id }) {
       <button type="button" className={ui.primarni} onClick={klik} disabled={saljem}>
         {saljem ? t.saljem : t.gumb}
       </button>
-      <p className={ui.pomoc}>{t.pomoc}</p>
+      <p className={ui.pomoc}>{izGreske ? t.pomocGreska : t.pomoc}</p>
+      {poslano && (
+        <p className={ui.pomoc} role="status">
+          {t.poslano}
+        </p>
+      )}
       {greska && (
         <p className={ui.greska} role="alert">
           {t.greske[greska] ?? t.greske.opce}

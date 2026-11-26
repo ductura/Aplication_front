@@ -107,6 +107,8 @@ export const hr = {
     gumb: "Pokušaj ponovno",
     saljem: "Šaljem…",
     pomoc: "Ponovno pokreće podizanje instance na poslužitelju institucije.",
+    pomocGreska: "Šalje zahtjev za instancu poslužitelju institucije još jednom, uz isti unos.",
+    poslano: "Ponovni pokušaj je poslan. Stanje se osvježava.",
     greske: {
       nema: "Institucija nije pronađena.",
       nije_ponovljivo: "Stanje instance se u međuvremenu promijenilo, pa novi pokušaj nije potreban.",

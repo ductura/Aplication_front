@@ -1,6 +1,6 @@
 // Detail and retry routes of the fake Aplication_server (APS-1302 contract as assumed by
 // APF-1301): GET /api/admin/institutions/{id} -> {institucija: {..., pokusaji: [...]}},
-// POST .../{id}/ponovi -> 202 {institucija} for zatrazena and u_izradi, 409 otherwise,
+// POST .../{id}/ponovi -> 202 {institucija} for zatrazena, u_izradi and greska (DAN-1532), 409 otherwise,
 // 404 for an unknown id. Test hook: POST /__stanje/{id} sets provisioning and attempts.
 // Without the hook the detail read moves the instance forward like the list read does
 // (zatrazena -> u_izradi -> aktivna, "odbijena." domains end in greska); after the hook the state is fixed.
@@ -31,7 +31,7 @@ export function rukujDetaljem(req, res, url, { institucije, prijavljen, posalji,
   i.pokusaji ??= [];
   if (ponovi) {
     const p = i.provisioning;
-    if (p.stanje !== "zatrazena" && p.stanje !== "u_izradi") return posalji(res, 409, { error: "nije_ponovljivo" });
+    if (p.stanje === "aktivna") return posalji(res, 409, { error: "nije_ponovljivo" });
     const sada = new Date().toISOString();
     i.pokusaji.push({ vrijeme: sada, ishod: "uspjeh", kodGreske: null });
     Object.assign(p, { stanje: "aktivna", aktivirano: sada, kodGreske: null, zadnjaGreska: null });

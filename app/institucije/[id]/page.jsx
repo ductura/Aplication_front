@@ -52,7 +52,10 @@ export default async function Institucija({ params }) {
                 <StanjeInstance stanje={stanje} /> <span>{t.opis[stanje] ?? ""}</span>
               </p>
               {stanje === STANJE_GRESKA && (
-                <p className={ui.greska}>{t.kodovi[p.kodGreske] ?? t.kodovi.neispravan_unos}</p>
+                <>
+                  <p className={ui.greska}>{t.kodovi[p.kodGreske] ?? t.kodovi.neispravan_unos}</p>
+                  <PonoviPokusaj id={i.id} izGreske />
+                </>
               )}
               {stanje === STANJE_U_IZRADI && p.zadnjaGreska && pokusaja > 0 && (
                 <p className={ui.pomoc}>{t.neuspjeliPokusaj(pokusaja)}</p>
